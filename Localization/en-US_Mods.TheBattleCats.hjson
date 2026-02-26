@@ -1,0 +1,117 @@
+Items: {
+	NyandamSummon: {
+		Tooltip: ""
+		DisplayName: Nyandam Summon
+	}
+
+	NyandamAltarItem: {
+		Tooltip: ""
+		DisplayName: Nyandam Altar Item
+	}
+
+	BunbunSummonItem: {
+		Tooltip: ""
+		DisplayName: Bunbun Summon Item
+	}
+
+	TheNerdsComputer: {
+		Tooltip: ""
+		DisplayName: The Nerds Computer
+	}
+
+	RamenMakersKit: {
+		Tooltip: ""
+		DisplayName: Ramen Makers Kit
+	}
+
+	LionCatItem: {
+		DisplayName: Lion Cat Item
+		Tooltip: ""
+	}
+
+	NeoCutterItem: {
+		DisplayName: Neo Cutter Item
+		Tooltip: ""
+	}
+
+	Amaterasu: {
+		DisplayName: Amaterasu
+		Tooltip: ""
+	}
+
+	AphroditeRose: {
+		DisplayName: Aphrodite Rose
+		Tooltip: ""
+	}
+
+	ChronosWatch: {
+		DisplayName: Chronos Watch
+		Tooltip: ""
+	}
+
+	MusashisKatana: {
+		DisplayName: Musashis Katana
+		Tooltip: ""
+	}
+
+	SanzoStaffItem: {
+		DisplayName: Sanzo Staff Item
+		Tooltip: ""
+	}
+}
+
+Buffs: {
+	SanzoStaffBuff: {
+		Description: Mods.TheBattleCats.Buffs.SanzoStaffBuff.Description
+		DisplayName: Sanzo Staff Buff
+	}
+}
+
+NPCs: {
+	Cyclone.DisplayName: Cyclone
+	ExampleBoss.DisplayName: Example Boss
+	Gabriel.DisplayName: Gabriel
+	LilBunbun.DisplayName: Lil Bunbun
+	Nyandam.DisplayName: Nyandam
+	Owlbro.DisplayName: Owlbro
+	TeacherBunbun.DisplayName: Teacher Bunbun
+	TimeGolem.DisplayName: Time Golem
+}
+
+Projectiles: {
+	AmaterasuEnd.DisplayName: Amaterasu End
+	AphroditeEnd.DisplayName: Aphrodite End
+	AmaterasuAttack.DisplayName: Amaterasu Attack
+	AmaterasuIdle.DisplayName: Amaterasu Idle
+	AmaterasuProjectile.DisplayName: Amaterasu Projectile
+	AphroditeDone.DisplayName: Aphrodite Done
+	AphroditeIdle.DisplayName: Aphrodite Idle
+	AphroditeRoseAttack.DisplayName: Aphrodite Rose Attack
+	AphroditeRoseProjectile.DisplayName: Aphrodite Rose Projectile
+	MusashiAttack1.DisplayName: Musashi Attack1
+	MusashiAttack2.DisplayName: Musashi Attack2
+	MusashiIdle.DisplayName: Musashi Idle
+	MusashiProjectile1.DisplayName: Musashi Projectile1
+	MusashiProjectile2.DisplayName: Musashi Projectile2
+	MusashiProjectileDone.DisplayName: Musashi Projectile Done
+	LilBunbunAttack.DisplayName: Lil Bunbun Attack
+	EnhancedLaserProjectile.DisplayName: Enhanced Laser Projectile
+	EnhancedNyandamPortal.DisplayName: Enhanced Nyandam Portal
+	EnhancedTelegraphLine.DisplayName: Enhanced Telegraph Line
+	LaserProjectile.DisplayName: Laser Projectile
+	NyandamAttack1Projectile.DisplayName: Nyandam Attack1 Projectile
+	NyandamAttack2Projectile.DisplayName: Nyandam Attack2 Projectile
+	NyandamAttack3Projectile.DisplayName: Nyandam Attack3 Projectile
+	NyandamAttack5Projectile.DisplayName: Nyandam Attack5 Projectile
+	NyandamEnhancedAttack2Projectile.DisplayName: Nyandam Enhanced Attack2 Projectile
+	NyandamEnhancedAttack3Projectile.DisplayName: Nyandam Enhanced Attack3 Projectile
+	NyandamPortal.DisplayName: Nyandam Portal
+	TelegraphLine.DisplayName: Telegraph Line
+	TeacherBunbunAttack.DisplayName: Teacher Bunbun Attack
+	TeacherBunbunSplash.DisplayName: Teacher Bunbun Splash
+	ChronosAttack1.DisplayName: Chronos Attack1
+	ChronosAttack2.DisplayName: Chronos Attack2
+	ChronosAttack3.DisplayName: Chronos Attack3
+	ChronosAttackDone.DisplayName: Chronos Attack Done
+	SanzoStaffMinion.DisplayName: Sanzo Staff Minion
+}

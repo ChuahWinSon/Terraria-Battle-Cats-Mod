@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "mnT0+VKTdTI=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\PREDATOR\\Documents\\My Games\\Terraria\\tModLoader\\ModSources\\draft1\\draft1.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\PREDATOR\\.nuget\\packages\\tmodloader.codeassist\\0.1.5\\tmodloader.codeassist.0.1.5.nupkg.sha512"
+  ],
+  "logs": []
+}
