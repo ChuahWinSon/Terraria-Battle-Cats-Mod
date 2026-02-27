@@ -76,6 +76,7 @@ NPCs: {
 	Owlbro.DisplayName: Owlbro
 	TeacherBunbun.DisplayName: Teacher Bunbun
 	TimeGolem.DisplayName: Time Golem
+	Tackey.DisplayName: Tackey
 }
 
 Projectiles: {
@@ -114,4 +115,6 @@ Projectiles: {
 	ChronosAttack3.DisplayName: Chronos Attack3
 	ChronosAttackDone.DisplayName: Chronos Attack Done
 	SanzoStaffMinion.DisplayName: Sanzo Staff Minion
+	TackeyProjectile.DisplayName: Tackey Projectile
+	TackeySmoke.DisplayName: Tackey Smoke
 }
