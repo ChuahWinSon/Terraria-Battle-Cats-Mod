@@ -58,6 +58,16 @@ Items: {
 		DisplayName: Sanzo Staff Item
 		Tooltip: ""
 	}
+
+	BunnyWeapon: {
+		DisplayName: Bunny Weapon
+		Tooltip: ""
+	}
+
+	BunnyWeaponOffhand: {
+		Tooltip: ""
+		DisplayName: Bunny Weapon Offhand
+	}
 }
 
 Buffs: {
@@ -117,4 +127,5 @@ Projectiles: {
 	SanzoStaffMinion.DisplayName: Sanzo Staff Minion
 	TackeyProjectile.DisplayName: Tackey Projectile
 	TackeySmoke.DisplayName: Tackey Smoke
+	BunnyWeaponRecoil.DisplayName: Bunny Weapon Recoil
 }
