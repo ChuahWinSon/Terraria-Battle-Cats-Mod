@@ -27,6 +27,7 @@ namespace TheBattleCats.Content.Items.Weapons
             Item.value        = Item.buyPrice(0, 5, 0, 0);
             Item.rare         = ItemRarityID.Green;
             Item.autoReuse    = false;
+            Item.scale = 0.4f;
         }
 
         // public override bool CanUseItem(Player player)
@@ -42,7 +43,7 @@ namespace TheBattleCats.Content.Items.Weapons
         }
 
         public override Vector2? HoldoutOffset() {
-			return new Vector2(0f,20f );  //(x,y )
+			return new Vector2(30f,20f );  //(x,y )
 		}
 
         public override bool Shoot(Player player, Terraria.DataStructures.EntitySource_ItemUse_WithAmmo source, Vector2 position, Vector2 velocity, int type, int damage, float knockback)

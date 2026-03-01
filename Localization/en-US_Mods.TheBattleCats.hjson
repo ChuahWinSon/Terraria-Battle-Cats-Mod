@@ -68,6 +68,21 @@ Items: {
 		Tooltip: ""
 		DisplayName: Bunny Weapon Offhand
 	}
+
+	KazaJizo: {
+		Tooltip: ""
+		DisplayName: Kaza Jizo
+	}
+
+	OwlbroWings: {
+		Tooltip: ""
+		DisplayName: Owlbro Wings
+	}
+
+	CatTicket: {
+		Tooltip: ""
+		DisplayName: Cat Ticket
+	}
 }
 
 Buffs: {
