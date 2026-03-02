@@ -75,12 +75,12 @@ Items: {
 	}
 
 	OwlbroWings: {
-		Tooltip: ""
+		Tooltip: Allows Flight and Long Slowfall
 		DisplayName: Owlbro Wings
 	}
 
 	CatTicket: {
-		Tooltip: ""
+		Tooltip: Exchange them for a reward
 		DisplayName: Cat Ticket
 	}
 }
@@ -102,6 +102,27 @@ NPCs: {
 	TeacherBunbun.DisplayName: Teacher Bunbun
 	TimeGolem.DisplayName: Time Golem
 	Tackey.DisplayName: Tackey
+
+	CatCapsule: {
+		TownNPCMood: {
+			DislikeNPC: I dislike {NPCName}.
+			LikeNPC: I like {NPCName}.
+			LoveNPC: I love {NPCName}.
+			DislikeBiome: I dislike {BiomeName}.
+			LikeBiome: I like {BiomeName}.
+			HateCrowded: I hate how crowded I am.
+			DislikeCrowded: I dislike how crowded I am.
+			LoveSpace: I love having so much space.
+			FarFromHome: I am too far from home.
+			NoHome: I hate not having a home.
+			Content: I am content.
+			HateNPC: I hate {NPCName}.
+			LikeNPC_Princess: I like {NPCName}.
+			Princess_LovesNPC: I like {NPCName}.
+		}
+
+		DisplayName: Cat Capsule
+	}
 }
 
 Projectiles: {
@@ -143,4 +164,12 @@ Projectiles: {
 	TackeyProjectile.DisplayName: Tackey Projectile
 	TackeySmoke.DisplayName: Tackey Smoke
 	BunnyWeaponRecoil.DisplayName: Bunny Weapon Recoil
+}
+
+Dialogue: {
+	CatCapsule: {
+		StandardDialogue1: Got any Cat Tickets for me?
+		StandardDialogue2: I have something special for anyone who brings me tickets...
+		RareDialogue: ...meow.
+	}
 }

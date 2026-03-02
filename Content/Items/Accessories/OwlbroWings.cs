@@ -18,12 +18,12 @@ namespace TheBattleCats.Content.Items.Accessories
 
         public override void UpdateAccessory(Player player, bool hideVisual)
         {
-            player.wingTimeMax = 200;  // how long the player can fly (ticks)
+            player.wingTimeMax = 20;  // how long the player can fly (ticks)
         }
 
         public override void VerticalWingSpeeds(Player player, ref float ascentWhenFalling, ref float ascentWhenRising, ref float maxCanAscendMultiplier, ref float maxAscentMultiplier, ref float constantAscend)
         {
-            ascentWhenFalling      = 0.85f; // speed when falling and holding jump
+            ascentWhenFalling      = 0.98f; // speed when falling and holding jump
             ascentWhenRising       = 0.15f; // acceleration upward
             maxCanAscendMultiplier = 1f;
             maxAscentMultiplier    = 3f;    // max upward speed multiplier
@@ -32,8 +32,8 @@ namespace TheBattleCats.Content.Items.Accessories
 
         public override void HorizontalWingSpeeds(Player player, ref float speed, ref float acceleration)
         {
-            speed        = 9f;   // max horizontal speed while flying
-            acceleration = 2.5f; // horizontal acceleration while flying
+            speed        = 4f;   // max horizontal speed while flying
+            acceleration = 1f; // horizontal acceleration while flying
         }
 
         public override void AddRecipes()
