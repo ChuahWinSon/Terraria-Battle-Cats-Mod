@@ -373,19 +373,21 @@ namespace TheBattleCats.Content.NPCs.NyandamBoss
             Vector2 velocity = new Vector2((float)Math.Cos(angleRadians), (float)Math.Sin(angleRadians)) * speed;
             Vector2 spawnPosition = NPC.Center + angleVector * radius;
 
-
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                spawnPosition,
-                velocity,
-                ModContent.ProjectileType<NyandamAttack1Projectile>(),
-                30,
-                1f,
-                Main.myPlayer,
-                AITimer, // Pass the aiTimer for release logic
-                angleRadians,
-                NPC.whoAmI
-            );
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {   
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    spawnPosition,
+                    velocity,
+                    ModContent.ProjectileType<NyandamAttack1Projectile>(),
+                    30,
+                    1f,
+                    Main.myPlayer,
+                    AITimer, // Pass the aiTimer for release logic
+                    angleRadians,
+                    NPC.whoAmI
+                );
+            }
         }
 
 
@@ -455,19 +457,21 @@ private void Attack2()
             Vector2 velocity = new Vector2((float)Math.Cos(angleRadians), (float)Math.Sin(angleRadians)) * speed;
             Vector2 spawnPosition = NPC.Center + angleVector * radius;
 
-
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                spawnPosition,
-                velocity,
-                ModContent.ProjectileType<NyandamAttack2Projectile>(),
-                30,
-                1f,
-                Main.myPlayer,
-                AITimer, // Pass the aiTimer for release logic
-                angleRadians,
-                NPC.whoAmI
-            );
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    spawnPosition,
+                    velocity,
+                    ModContent.ProjectileType<NyandamAttack2Projectile>(),
+                    30,
+                    1f,
+                    Main.myPlayer,
+                    AITimer, // Pass the aiTimer for release logic
+                    angleRadians,
+                    NPC.whoAmI
+                );
+            }
         }     
       
       
@@ -541,14 +545,17 @@ private void Attack2()
                     float angle = i / (float)bulletCount * spiralSpread;
                     Vector2 dir = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
 
-                    Projectile.NewProjectile(
-                        NPC.GetSource_FromAI(),
-                        NPC.Center,
-                        dir, // Initial direction (doesn't matter much for our logic)
-                        ModContent.ProjectileType<NyandamAttack3Projectile>(),
-                        30, 1f, NPC.target
+                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    {
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            NPC.Center,
+                            dir, // Initial direction (doesn't matter much for our logic)
+                            ModContent.ProjectileType<NyandamAttack3Projectile>(),
+                            30, 1f, NPC.target
                         
                     );
+                    }
                 }
         }
 
@@ -655,13 +662,16 @@ private void Attack2()
             {
                 int x = (int)(NPC.Center.X + Attack4Part1Random - lineSpacing * (lineCount / 2) + i * lineSpacing);
                 Vector2 telePos = new Vector2(x, NPC.Center.Y - 550);
-                Projectile.NewProjectile(
-                    NPC.GetSource_FromAI(),
-                    telePos,
-                    Vector2.Zero,
-                    ModContent.ProjectileType<TelegraphLine>(),
-                    0, 0, Main.myPlayer
-                );
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        telePos,
+                        Vector2.Zero,
+                        ModContent.ProjectileType<TelegraphLine>(),
+                        0, 0, Main.myPlayer
+                    );
+                }
             }
         }
 
@@ -676,13 +686,17 @@ private void Attack2()
             {
                 int x = (int)(NPC.Center.X + Attack4Part1Random- lineSpacing * (lineCount / 2) + i * lineSpacing);
                 Vector2 projPos = new Vector2(x, NPC.Center.Y + 500);
-                Projectile.NewProjectile(
-                    NPC.GetSource_FromAI(),
-                    projPos,
-                    new Vector2(0, projSpeed),
-                    ModContent.ProjectileType<LaserProjectile>(),
-                    projDamage, 2f, Main.myPlayer
-                );
+
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        projPos,
+                        new Vector2(0, projSpeed),
+                        ModContent.ProjectileType<LaserProjectile>(),
+                        projDamage, 2f, Main.myPlayer
+                    );
+                }
             }
         }
 
@@ -718,13 +732,16 @@ private void Attack2()
 
                     if (i == Attack5SkippedIndex) continue;
 
-                    Projectile.NewProjectile(
-                        NPC.GetSource_FromAI(),
-                        PortalPositions[i],
-                        Vector2.Zero,
-                        ModContent.ProjectileType<NyandamPortal>(),
-                        0, 0, Main.myPlayer
-                    );
+                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    {
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            PortalPositions[i],
+                            Vector2.Zero,
+                            ModContent.ProjectileType<NyandamPortal>(),
+                            0, 0, Main.myPlayer
+                        );
+                    }
                 }
             }
 
@@ -734,13 +751,16 @@ private void Attack2()
                 {
                     if (i == Attack5SkippedIndex) continue;
 
-                    Projectile.NewProjectile(
-                        NPC.GetSource_FromAI(),
-                        PortalPositions[i],
-                        new Vector2(0, -10),
-                        ModContent.ProjectileType<NyandamAttack5Projectile>(),
-                        40, 1f, Main.myPlayer
-                    );
+                    if (Main.netMode != NetmodeID.MultiplayerClient)
+                    {
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            PortalPositions[i],
+                            new Vector2(0, -10),
+                            ModContent.ProjectileType<NyandamAttack5Projectile>(),
+                            40, 1f, Main.myPlayer
+                        );
+                    }
                 }
             }
 
@@ -838,6 +858,7 @@ private void Attack2()
             }
         }
 
+        private float EnhancedAttack1Increment;
 
         private void EnhancedAttack1()
         {
@@ -847,13 +868,13 @@ private void Attack2()
             {
                 //STILL USING THE SAME INCREMENT AS ATTACK 1 SO IT MIGHT CAUSE SOME PROBLEMS BUT
                 // IF THERE ARE U CAN JUST MAKE ENHANCEDATTACK1INCREMENT
-                Attack1Increment += 1;
-                if (Attack1Increment >= 3)
+                EnhancedAttack1Increment += 1;
+                if (EnhancedAttack1Increment >= 3)
                 {
                     EnhancedLastAttack = ActionState.EnhancedAttack1;
                     AIState = (float)ActionState.Transform;
 
-                    Attack1Increment = 0;
+                    EnhancedAttack1Increment = 0;
                 }
                 AITimer = 0;
                 NPC.netUpdate = true; // sync with clients in multiplayer
@@ -895,18 +916,21 @@ private void Attack2()
             Vector2 spawnPosition = NPC.Center + angleVector * radius;
 
 
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                spawnPosition,
-                velocity,
-                ModContent.ProjectileType<NyandamAttack1Projectile>(),
-                30,
-                1f,
-                Main.myPlayer,
-                AITimer, // Pass the aiTimer for release logic
-                angleRadians,
-                NPC.whoAmI
-            );
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    spawnPosition,
+                    velocity,
+                    ModContent.ProjectileType<NyandamAttack1Projectile>(),
+                    30,
+                    1f,
+                    Main.myPlayer,
+                    AITimer, // Pass the aiTimer for release logic
+                    angleRadians,
+                    NPC.whoAmI
+                );
+            }
         }
 
 
@@ -990,26 +1014,27 @@ private void EnhancedAttack2()
             Vector2 velocity = new Vector2((float)Math.Cos(angleRadians), (float)Math.Sin(angleRadians)) * speed;
             Vector2 spawnPosition = NPC.Center + angleVector * radius;
 
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
 
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                spawnPosition,
-                velocity,
-                ModContent.ProjectileType<NyandamEnhancedAttack2Projectile>(),
-                30,
-                1f,
-                Main.myPlayer,
-                AITimer, // Pass the aiTimer for release logic
-                angleRadians,
-                NPC.whoAmI
-            );
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    spawnPosition,
+                    velocity,
+                    ModContent.ProjectileType<NyandamEnhancedAttack2Projectile>(),
+                    30,
+                    1f,
+                    Main.myPlayer,
+                    AITimer, // Pass the aiTimer for release logic
+                    angleRadians,
+                    NPC.whoAmI
+                );
+            }
         }     
       
 
 
-
-
-
+        
         private void EnhancedAttack3()
         {
             AITimer++;
@@ -1081,13 +1106,16 @@ private void SpawnEnhancedAttack3()
 
     Vector2 velocity = new Vector2(fromLeft ? 10f : -10f, 0f);
 
-    Projectile.NewProjectile(
-        NPC.GetSource_FromAI(),
-        spawnPos,
-        velocity,
-        ModContent.ProjectileType<NyandamEnhancedAttack3Projectile>(),
-        30, 2f, Main.myPlayer
-    );
+    if (Main.netMode != NetmodeID.MultiplayerClient)
+    {
+        Projectile.NewProjectile(
+            NPC.GetSource_FromAI(),
+            spawnPos,
+            velocity,
+            ModContent.ProjectileType<NyandamEnhancedAttack3Projectile>(),
+            30, 2f, Main.myPlayer
+        );
+    }
 }
 
         private void EnhancedAttack4()
@@ -1137,13 +1165,18 @@ private void SpawnEnhancedAttack3()
             {
                 int y = (int)(NPC.Center.Y + Attack4Part1Random - lineSpacing * (lineCount / 2) + i * lineSpacing);
                 Vector2 telePos = new Vector2(NPC.Center.X, y);
-                Projectile.NewProjectile(
-                    NPC.GetSource_FromAI(),
-                    telePos,
-                    Vector2.Zero,
-                    ModContent.ProjectileType<EnhancedTelegraphLine>(), // CHANGED
-                    0, 0, Main.myPlayer
-                );
+
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        telePos,
+                        Vector2.Zero,
+                        ModContent.ProjectileType<EnhancedTelegraphLine>(), // CHANGED
+                        0, 0, Main.myPlayer
+                
+                    );
+                }
             }
         }
 
@@ -1157,13 +1190,17 @@ private void SpawnEnhancedAttack3()
             {
                 int y = (int)(NPC.Center.Y + Attack4Part1Random - lineSpacing * (lineCount / 2) + i * lineSpacing);
                 Vector2 projPos = new Vector2(NPC.Center.X - 1200, y); // spawn off screen left
-                Projectile.NewProjectile(
-                    NPC.GetSource_FromAI(),
-                    projPos,
-                    new Vector2(30, 0), // moves right
-                    ModContent.ProjectileType<EnhancedLaserProjectile>(), // CHANGED
-                    projDamage, 2f, Main.myPlayer
-                );
+
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        projPos,
+                        new Vector2(30, 0), // moves right
+                        ModContent.ProjectileType<EnhancedLaserProjectile>(), // CHANGED
+                        projDamage, 2f, Main.myPlayer
+                    );
+                }
             }
         }
         
@@ -1200,13 +1237,17 @@ private void EnhancedAttack5()
 
             if (i == Attack5SkippedIndex) continue;
 
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                PortalPositions[i],
-                Vector2.Zero,
-                ModContent.ProjectileType<EnhancedNyandamPortal>(),
-                0, 0, Main.myPlayer
-            );
+
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    PortalPositions[i],
+                    Vector2.Zero,
+                    ModContent.ProjectileType<EnhancedNyandamPortal>(),
+                    0, 0, Main.myPlayer
+                );
+            }
         }
     }
 
@@ -1216,13 +1257,16 @@ private void EnhancedAttack5()
         {
             if (i == Attack5SkippedIndex) continue;
 
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                PortalPositions[i],
-                new Vector2(0, -10),
-                ModContent.ProjectileType<NyandamAttack5Projectile>(),
-                40, 1f, Main.myPlayer
-            );
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    PortalPositions[i],
+                    new Vector2(0, -10),
+                    ModContent.ProjectileType<NyandamAttack5Projectile>(),
+                    40, 1f, Main.myPlayer
+                );
+            }
         }
     }
 
