@@ -83,6 +83,11 @@ Items: {
 		Tooltip: Exchange them for a reward
 		DisplayName: Cat Ticket
 	}
+
+	CatFood: {
+		Tooltip: ""
+		DisplayName: Cat Food
+	}
 }
 
 Buffs: {

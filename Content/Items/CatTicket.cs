@@ -26,10 +26,6 @@ namespace TheBattleCats.Content.Items
 			Item.value = Item.buyPrice(silver: 1); // The value of the item in copper coins. Item.buyPrice & Item.sellPrice are helper methods that returns costs in copper coins based on platinum/gold/silver/copper arguments provided to it.
 		}
 
-        public override void PostUpdate()
-{
-    Item.scale = 0.5f;
-}
 
         public override bool PreDrawInWorld(SpriteBatch spriteBatch, Color lightColor, Color alphaColor, ref float rotation, ref float scale, int whoAmI)
 {
