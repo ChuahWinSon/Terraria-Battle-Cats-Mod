@@ -88,12 +88,22 @@ Items: {
 		Tooltip: ""
 		DisplayName: Cat Food
 	}
+
+	CyberpunkChairItem: {
+		Tooltip: ""
+		DisplayName: Cyberpunk Chair Item
+	}
 }
 
 Buffs: {
 	SanzoStaffBuff: {
 		Description: Mods.TheBattleCats.Buffs.SanzoStaffBuff.Description
 		DisplayName: Sanzo Staff Buff
+	}
+
+	CyberpunkChairBuff: {
+		Description: Mods.TheBattleCats.Buffs.CyberpunkChairBuff.Description
+		DisplayName: Cyberpunk Chair Buff
 	}
 }
 
