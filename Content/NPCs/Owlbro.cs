@@ -245,7 +245,7 @@ namespace TheBattleCats.Content.NPCs
             else if (State == ActionState.Attack)
             {
                 // Flip sprite based on which horizontal direction we're dashing
-                NPC.spriteDirection = NPC.velocity.X < 0f ? 1 : -1;
+                NPC.spriteDirection = NPC.velocity.X < 0f ? -1 : 1;
                 
                 // Frame 6 = attack
                 NPC.frame.Y = 6 * frameHeight;

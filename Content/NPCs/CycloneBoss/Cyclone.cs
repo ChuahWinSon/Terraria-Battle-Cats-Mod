@@ -21,7 +21,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Idle,
             Attack1,
-
+            Attack2,
+            Attack3,
         }
 
         public ref float AIState => ref NPC.ai[0];
@@ -43,8 +44,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             NPC.knockBackResist = 0f;
             NPC.noGravity = true;
             NPC.noTileCollide = true;
-            NPC.width = 140;
-            NPC.height = 140;
+            NPC.width = 120;
+            NPC.height = 120;
             NPC.boss = true;
         }
 
@@ -95,6 +96,13 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Attack1:
                     Attack1();
                     break;
+                case (float)ActionState.Attack2:
+                    Attack2();
+                    break;
+                case (float)ActionState.Attack3:
+                    Attack3();
+                    break;
+                
 
             }
 
@@ -110,7 +118,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack1;
+                AIState = (float)ActionState.Attack3;
             }
         }
 
@@ -173,8 +181,203 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 AITimer = 0f;
                 OrbitAngle = 0f;
                 LaunchDirection = Vector2.Zero;
-                AIState = (float)ActionState.Attack1;
+                AIState = (float)ActionState.Attack2;
             }
         }
+
+    private float Attack2Angle = 0f;
+private Vector2 CycloneLaunchTarget = Vector2.Zero;
+
+private void Attack2()
+{
+    Player player = Main.player[NPC.target];
+    AITimer++;
+
+    if (AITimer == 1f)
+    {
+        // Pick random angle, place all 3 (2 copies + boss) evenly around circle
+        Attack2Angle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+        CycloneLaunchTarget = player.Center; // store player pos once
+
+        float angle1 = Attack2Angle;
+        float angle2 = Attack2Angle + MathHelper.TwoPi / 3f;
+        float angle3 = Attack2Angle + MathHelper.TwoPi / 3f * 2f;
+
+        // Teleport main boss to its position
+        NPC.Center = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle1);
+        NPC.alpha  = 255;
+
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            NPC.NewNPC(NPC.GetSource_FromAI(), 
+                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle2)).X,
+                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle2)).Y,
+                ModContent.NPCType<CycloneClone>());
+
+            NPC.NewNPC(NPC.GetSource_FromAI(),
+                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle3)).X,
+                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle3)).Y,
+                ModContent.NPCType<CycloneClone>());
+        }
+        NPC.netUpdate = true;
+    }
+
+    if (AITimer >= 1f)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(255, 0, (AITimer - 60f) / 60f);
+    }
+
+    if (AITimer <= 120f)
+    {
+        NPC.velocity = Vector2.Zero;
+        NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
+        NPC.spriteDirection = NPC.direction;
+        return;
+    }
+
+
+    // Dash toward stored player position
+    Vector2 launchDir = Vector2.Normalize(CycloneLaunchTarget - NPC.Center);
+    NPC.velocity = launchDir * 14f;
+
+    if (AITimer >= 180f)
+    {
+        NPC.alpha  = 0;
+        AITimer    = 0f;
+        CycloneLaunchTarget = Vector2.Zero;
+        AIState    = (float)ActionState.Idle;
+    }
 }
+private int ShootTimer = 0;
+
+private void Attack3()
+{
+    Player player = Main.player[NPC.target];
+    AITimer++;
+
+    // Slowly move toward player
+    Vector2 toPlayer = Vector2.Normalize(player.Center - NPC.Center);
+    NPC.velocity = Vector2.Lerp(NPC.velocity, toPlayer * 3f, 0.05f);
+
+    // Face player
+    NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
+    NPC.spriteDirection = NPC.direction;
+
+    // Shoot every 30 ticks (0.5 seconds)
+    ShootTimer++;
+    if (ShootTimer >= 30)
+    {
+        ShootTimer = 0;
+
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            // Pick random projectile from 4 types
+            int projType = Main.rand.Next(4) switch
+            {
+                0 => ModContent.ProjectileType<CycloneProjectile1>(),
+                1 => ModContent.ProjectileType<CycloneProjectile2>(),
+                2 => ModContent.ProjectileType<CycloneProjectile3>(),
+                _ => ModContent.ProjectileType<CycloneProjectile4>(),
+            };
+
+            Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
+            int damage = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+
+            Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),
+                NPC.Center,
+                shootDir * 10f,
+                projType,
+                damage,
+                2f,
+                Main.myPlayer
+            );
+        }
+    }
+
+    // End after 5 seconds
+    if (AITimer >= 300f)
+    {
+        ShootTimer = 0;
+        AITimer    = 0f;
+        AIState    = (float)ActionState.Attack1;
+    }
+}
+
+}
+
+public class CycloneClone : ModNPC
+{
+    public ref float AITimer => ref NPC.ai[0];
+    private Vector2 LaunchTarget = Vector2.Zero;
+    
+    private const int FadeInDuration = 120;
+    private const int TargetAlpha    = 160; // semi transparent, lower = more visible
+
+    public override void SetDefaults()
+    {
+        NPC.width         = 140;
+        NPC.height        = 140;
+        NPC.damage        = 30;
+        NPC.defense       = 0;
+        NPC.lifeMax       = 1;
+        NPC.noGravity     = true;
+        NPC.noTileCollide = true;
+        NPC.knockBackResist = 0f;
+        NPC.alpha         = 255; // start invisible
+    }
+
+    public override void SetStaticDefaults()
+    {
+        Main.npcFrameCount[NPC.type] = 29;
+    }
+
+    
+
+    public override void FindFrame(int frameHeight)
+    {
+        NPC.frameCounter++;
+        if (NPC.frameCounter >= 4) // 12 fps
+        {
+            NPC.frameCounter = 0;
+            NPC.frame.Y += frameHeight;
+            if (NPC.frame.Y >= frameHeight * Main.npcFrameCount[NPC.type])
+                NPC.frame.Y = 0;
+        }
+    }
+
+    public override void AI()
+    {
+        AITimer++;
+        NPC.TargetClosest(true);
+        Player player = Main.player[NPC.target];
+
+        // Store player position once on first tick
+        if (AITimer == 1f)
+        {
+            LaunchTarget = player.Center;
+            NPC.netUpdate = true;
+        }
+
+        // Fade in to semi transparent
+        if (AITimer <= FadeInDuration)
+        {
+            NPC.alpha = (int)MathHelper.Lerp(255, TargetAlpha, AITimer / FadeInDuration);
+            NPC.velocity = Vector2.Zero;
+            NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
+            NPC.spriteDirection = NPC.direction;
+            return;
+        }
+
+        // Dash toward stored player position
+        Vector2 launchDir = Vector2.Normalize(LaunchTarget - NPC.Center);
+        NPC.velocity = launchDir * 14f;
+
+        if (AITimer >= 180f)
+            NPC.active = false;
+
+            
+    }
+}
+
 }

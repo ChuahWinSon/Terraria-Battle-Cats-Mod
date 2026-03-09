@@ -103,7 +103,7 @@ namespace TheBattleCats.Content.NPCs
             float diff    = targetX - NPC.Center.X;
 
             // Face the player
-            NPC.spriteDirection = NPC.direction = (player.Center.X > NPC.Center.X) ? -1 : 1;
+            NPC.spriteDirection = NPC.direction = (player.Center.X > NPC.Center.X) ? 1 : -1;
 
             if (Math.Abs(diff) <= PositionTolerance)
             {
@@ -208,11 +208,11 @@ namespace TheBattleCats.Content.NPCs
                 Main.myPlayer
             );
 
-            Vector2 spawnPosSmoke = NPC.Center + new Vector2(NPC.spriteDirection * 16f, -20f);
+            Vector2 spawnPosSmoke = NPC.Center + new Vector2(NPC.spriteDirection * 24f, -20f) + new Vector2(20f,0);
 
             Projectile.NewProjectile(
                 NPC.GetSource_FromAI(),
-                spawnPos,
+                spawnPosSmoke,
                 direction * speed,
                 ModContent.ProjectileType<TackeySmoke>(),
                 0,
