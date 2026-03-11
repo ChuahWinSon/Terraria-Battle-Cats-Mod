@@ -75,7 +75,7 @@ Items: {
 	}
 
 	OwlbroWings: {
-		Tooltip: Allows Flight and Long Slowfall
+		Tooltip: Allows Flight and Slowfall
 		DisplayName: Owlbro Wings
 	}
 
@@ -92,6 +92,11 @@ Items: {
 	CyberpunkChairItem: {
 		Tooltip: ""
 		DisplayName: Cyberpunk Chair Item
+	}
+
+	CatCapsuleMachineItem: {
+		Tooltip: ""
+		DisplayName: Cat Capsule Machine Item
 	}
 }
 
@@ -112,7 +117,7 @@ NPCs: {
 	ExampleBoss.DisplayName: Example Boss
 	Gabriel.DisplayName: Gabriel
 	LilBunbun.DisplayName: Lil Bunbun
-	Nyandam.DisplayName: Nyandam
+	Nyandam.DisplayName: Dark Emperor Nyandam
 	Owlbro.DisplayName: Owlbro
 	TeacherBunbun.DisplayName: Teacher Bunbun
 	TimeGolem.DisplayName: Time Golem
@@ -138,6 +143,8 @@ NPCs: {
 
 		DisplayName: Cat Capsule
 	}
+
+	CycloneClone.DisplayName: Cyclone Clone
 }
 
 Projectiles: {
@@ -179,6 +186,10 @@ Projectiles: {
 	TackeyProjectile.DisplayName: Tackey Projectile
 	TackeySmoke.DisplayName: Tackey Smoke
 	BunnyWeaponRecoil.DisplayName: Bunny Weapon Recoil
+	CycloneProjectile4.DisplayName: Cyclone Projectile4
+	CycloneProjectile3.DisplayName: Cyclone Projectile3
+	CycloneProjectile2.DisplayName: Cyclone Projectile2
+	CycloneProjectile1.DisplayName: Cyclone Projectile1
 }
 
 Dialogue: {

@@ -3,8 +3,9 @@ using Terraria.ID;
 using Terraria.ModLoader;
 using TheBattleCats.Content.Tiles;
 
-namespace TheBattleCats.Content.Items.Consumables
+namespace TheBattleCats.Content.Items.Placeable
 {
+
     public class NyandamAltarItem : ModItem
     {
 
@@ -19,7 +20,7 @@ namespace TheBattleCats.Content.Items.Consumables
             Item.useTime = 10;
             Item.useStyle = ItemUseStyleID.Swing;
             Item.consumable = true;
-            Item.createTile = ModContent.TileType<Tiles.NyandamAltar>(); // Your tile class
+            Item.createTile = ModContent.TileType<NyandamAltar>(); // Your tile class
         }
 
         public override void AddRecipes()

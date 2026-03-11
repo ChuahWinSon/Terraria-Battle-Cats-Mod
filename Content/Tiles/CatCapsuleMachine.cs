@@ -9,7 +9,7 @@ using TheBattleCats.Content.Items.Consumables;
 
 namespace TheBattleCats.Content.Tiles
 {
-    public class NyandamAltar : ModTile
+    public class CatCapsuleMachine : ModTile
     {
         public override void SetStaticDefaults()
         {
