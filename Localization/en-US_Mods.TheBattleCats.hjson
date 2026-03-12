@@ -98,6 +98,16 @@ Items: {
 		Tooltip: ""
 		DisplayName: Cat Capsule Machine Item
 	}
+
+	RareCatTicket: {
+		Tooltip: ""
+		DisplayName: Rare Cat Ticket
+	}
+
+	PlatinumCatTicket: {
+		Tooltip: ""
+		DisplayName: Platinum Cat Ticket
+	}
 }
 
 Buffs: {
@@ -199,3 +209,5 @@ Dialogue: {
 		RareDialogue: ...meow.
 	}
 }
+
+Tiles.CatCapsuleMachine.MapEntry: Cat Capsule Machine
