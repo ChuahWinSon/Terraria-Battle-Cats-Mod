@@ -200,6 +200,7 @@ Projectiles: {
 	CycloneProjectile3.DisplayName: Cyclone Projectile3
 	CycloneProjectile2.DisplayName: Cyclone Projectile2
 	CycloneProjectile1.DisplayName: Cyclone Projectile1
+	CycloneTelegraph.DisplayName: Cyclone Telegraph
 }
 
 Dialogue: {

@@ -23,6 +23,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Attack1,
             Attack2,
             Attack3,
+            Attack4,
         }
 
         public ref float AIState => ref NPC.ai[0];
@@ -102,6 +103,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Attack3:
                     Attack3();
                     break;
+                case (float)ActionState.Attack4:
+                    Attack4();
+                    break;
                 
 
             }
@@ -118,7 +122,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack3;
+                AIState = (float)ActionState.Attack4;
             }
         }
 
@@ -161,11 +165,14 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 NPC.alpha = (int)MathHelper.Lerp(255, 0, (AITimer - 60f) / 60f);
                 OrbitAngle += OrbitSpeed;
 
-                Vector2 targetPos = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(OrbitAngle);
-                NPC.velocity = targetPos - NPC.Center;
+                Vector2 targetPos     = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(OrbitAngle);
+                Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+                NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.15f);
 
                 return;
             }
+
+            
 
             // Phase 4: launch at player center
             if (LaunchDirection == Vector2.Zero)
@@ -181,7 +188,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 AITimer = 0f;
                 OrbitAngle = 0f;
                 LaunchDirection = Vector2.Zero;
-                AIState = (float)ActionState.Attack2;
+                AIState = (float)ActionState.Attack1;
             }
         }
 
@@ -302,6 +309,76 @@ private void Attack3()
         AITimer    = 0f;
         AIState    = (float)ActionState.Attack1;
     }
+}
+
+
+private float Attack4Timer = 0f;
+private float Attack4Angle = 0f;
+
+private void Attack4()
+{
+    Player player = Main.player[NPC.target];
+    Attack4Timer++;
+
+    // Phase 1: disappear (0-60 ticks)
+    if (Attack4Timer < 60f)
+    {
+        NPC.velocity = Vector2.Zero;
+        NPC.alpha = (int)MathHelper.Lerp(0, 255, Attack4Timer / 60f);
+        return;
+    }
+
+    // Phase 2: teleport to bottom of player
+    if (Attack4Timer == 61f)
+    {
+        // Start from directly below the player
+        Attack4Angle = MathHelper.PiOver2; // 90 degrees = bottom
+        NPC.Center   = player.Center + new Vector2(0f, OrbitRadius);
+        NPC.alpha    = 255;
+        NPC.velocity = Vector2.Zero;
+        NPC.netUpdate = true;
+    }
+
+    // Phase 3: arc from bottom to top (90 degrees to -90 degrees = half circle)
+    float targetAngle = -MathHelper.PiOver2; // top of player
+    if (Attack4Timer >= 61f && Attack4Angle > targetAngle)
+    {
+        // Fade in
+        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((Attack4Timer - 61f) / 60f, 1f));
+
+        // Rotate from bottom toward top
+        Attack4Angle -= OrbitSpeed;
+
+        Vector2 idealPos     = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(Attack4Angle);
+        float   dist         = Vector2.Distance(NPC.Center, idealPos);
+        float   catchUpSpeed = MathHelper.Clamp(dist / 10f, 3f, 30f);
+
+        NPC.velocity        = Vector2.Normalize(idealPos - NPC.Center) * catchUpSpeed;
+        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+        NPC.spriteDirection = NPC.direction;
+        return;
+    }
+
+    // Phase 4: hover above player mimicking their movement
+    if (Attack4Timer >= 61f && Attack4Angle <= targetAngle)
+    {
+        NPC.alpha = 0;
+
+        float horizontalOffset = 0f;
+        float xDiff = NPC.Center.X - player.Center.X;
+        if (Math.Abs(xDiff) < 20f)
+        {
+            horizontalOffset = xDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 140f : -140f) : Math.Sign(xDiff) * 40f;
+        }
+
+        Vector2 targetPos    = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - OrbitRadius);
+        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+        NPC.velocity         = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
+
+        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+        NPC.spriteDirection = NPC.direction;
+    }
+  
 }
 
 }

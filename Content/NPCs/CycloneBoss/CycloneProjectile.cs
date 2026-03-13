@@ -87,4 +87,25 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Projectile.rotation = Projectile.velocity.ToRotation();
         }
     }
+
+    public class CycloneTelegraph : ModProjectile
+    {
+        public override void SetDefaults()
+        {
+            Projectile.width       = 20;
+            Projectile.height      = 600; // tall to show the fall path
+            Projectile.friendly    = false;
+            Projectile.hostile     = false;
+            Projectile.tileCollide = false;
+            Projectile.timeLeft    = 60; // lasts 1 second then disappears
+            Projectile.aiStyle     = -1;
+            Projectile.alpha       = 180; // semi transparent
+        }
+
+        public override void AI()
+        {
+            // Fade out as timeLeft decreases
+            Projectile.alpha = (int)MathHelper.Lerp(180, 255, 1f - Projectile.timeLeft / 60f);
+        }
+    }
 }
