@@ -12,6 +12,48 @@ using ReLogic.Content;
 
 namespace TheBattleCats.Content.NPCs.CycloneBoss
 {
+
+    public class TelegraphLines : ModProjectile
+    {
+
+        public override void SetDefaults()
+        {
+            Projectile.width = 4;
+            Projectile.height = 400; // tall vertical line
+            Projectile.penetrate = -1;
+            Projectile.timeLeft = 40; 
+            Projectile.tileCollide = false;
+            Projectile.ignoreWater = true;
+        }
+
+        public override void AI()
+        {
+            // Optional: make the line fade out
+            Projectile.alpha += 8;
+        }
+
+            public override bool PreDraw(ref Color lightColor)
+        {
+            Texture2D pixel = Terraria.GameContent.TextureAssets.MagicPixel.Value;
+            
+            Vector2 drawPos = Projectile.Center - Main.screenPosition;
+            Rectangle lineRect = new Rectangle(
+                (int)drawPos.X - 2,  // centered, 4px wide
+                (int)drawPos.Y - 300, // top of line
+                4,    // width
+                2000   // height (stretch the pixel into a tall line)
+            );
+
+            Main.spriteBatch.Draw(
+                pixel,
+                lineRect,
+                Color.Red * ((255 - Projectile.alpha) / 255f)
+            );
+
+            return false;
+        }
+    }
+
     public class CycloneProjectile1 : ModProjectile
     {
         public override void SetDefaults()
@@ -27,7 +69,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void AI()
         {
-            Projectile.rotation = Projectile.velocity.ToRotation();
+            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
         }
     }
 
@@ -46,7 +88,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void AI()
         {
-            Projectile.rotation = Projectile.velocity.ToRotation();
+            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
         }
     }
 
@@ -65,7 +107,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void AI()
         {
-            Projectile.rotation = Projectile.velocity.ToRotation();
+            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
         }
     }
 
@@ -84,7 +126,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void AI()
         {
-            Projectile.rotation = Projectile.velocity.ToRotation();
+            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
         }
     }
 

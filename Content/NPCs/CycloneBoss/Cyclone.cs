@@ -122,7 +122,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack3;
+                AIState = (float)ActionState.Attack4;
             }
         }
 
@@ -312,73 +312,162 @@ private void Attack3()
 }
 
 
-private float Attack4Timer = 0f;
-private float Attack4Angle = 0f;
+private float Attack4LoopCount = 0f;
+private bool  Attack4LinesSpawned = false;
+private int   Attack4Part1Random = 0;
+private float Attack4Angle     = 0f;
+private float Attack4HoverTimer = 0f;
 
 private void Attack4()
 {
     Player player = Main.player[NPC.target];
-    Attack4Timer++;
+    AITimer++;
 
     // Phase 1: disappear (0-60 ticks)
-    if (Attack4Timer < 60f)
+    if (AITimer < 60f)
     {
         NPC.velocity = Vector2.Zero;
-        NPC.alpha = (int)MathHelper.Lerp(0, 255, Attack4Timer / 60f);
+        NPC.alpha    = (int)MathHelper.Lerp(0, 255, AITimer / 60f);
         return;
     }
 
     // Phase 2: teleport to bottom of player
-    if (Attack4Timer == 61f)
+    if (AITimer == 61f)
     {
-        // Start from directly below the player
-        Attack4Angle = MathHelper.PiOver2; // 90 degrees = bottom
-        NPC.Center   = player.Center + new Vector2(0f, OrbitRadius);
-        NPC.alpha    = 255;
-        NPC.velocity = Vector2.Zero;
-        NPC.netUpdate = true;
+        Attack4Angle          = MathHelper.PiOver2;
+        NPC.Center            = player.Center + new Vector2(0f, OrbitRadius);
+        NPC.alpha             = 255;
+        NPC.velocity          = Vector2.Zero;
+        Attack4LinesSpawned   = false;
+        int dir               = Main.rand.NextBool() ? 1 : -1;
+        Attack4Part1Random    = dir * Main.rand.Next(3, 6) * 16;
+        NPC.netUpdate         = true;
+
+        
     }
 
-    // Phase 3: arc from bottom to top (90 degrees to -90 degrees = half circle)
-    float targetAngle = -MathHelper.PiOver2; // top of player
-    if (Attack4Timer >= 61f && Attack4Angle > targetAngle)
+    // Phase 3: arc from bottom to top
+    float targetAngle = -MathHelper.PiOver2;
+    if (AITimer >= 61f && Attack4Angle > targetAngle)
     {
-        // Fade in
-        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((Attack4Timer - 61f) / 60f, 1f));
-
-        // Rotate from bottom toward top
+        NPC.alpha    = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
         Attack4Angle -= OrbitSpeed;
 
-        Vector2 idealPos     = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(Attack4Angle);
-        float   dist         = Vector2.Distance(NPC.Center, idealPos);
-        float   catchUpSpeed = MathHelper.Clamp(dist / 10f, 3f, 30f);
+        Vector2 idealPos      = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(Attack4Angle);
+        Vector2 idealVelocity = Vector2.Normalize(idealPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, idealPos) / 8f, 2f, 20f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
 
-        NPC.velocity        = Vector2.Normalize(idealPos - NPC.Center) * catchUpSpeed;
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
         return;
     }
 
-    // Phase 4: hover above player mimicking their movement
-    if (Attack4Timer >= 61f && Attack4Angle <= targetAngle)
+    // Phase 4: hover above player
+    if (AITimer >= 61f && Attack4Angle <= targetAngle)
     {
         NPC.alpha = 0;
 
         float horizontalOffset = 0f;
         float xDiff = NPC.Center.X - player.Center.X;
         if (Math.Abs(xDiff) < 20f)
-        {
             horizontalOffset = xDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 140f : -140f) : Math.Sign(xDiff) * 40f;
-        }
 
-        Vector2 targetPos    = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - OrbitRadius);
+        Vector2 targetPos     = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - OrbitRadius);
         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
-        NPC.velocity         = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
 
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
+
+        Attack4HoverTimer++;
+
+        if (Attack4HoverTimer == 60f && !Attack4LinesSpawned)
+        {
+            SpawnTelegraphLines(player);
+        }
+        // Fire lasers 40 ticks after telegraph
+        if (Attack4HoverTimer == 120f && !Attack4LinesSpawned)
+        {
+            SpawnLaserProjectiles(player);
+            Attack4LinesSpawned = true;
+        }
+
+        // Each loop: wait 120 ticks then repeat
+        if (Attack4HoverTimer >= 180f)
+        {
+            Attack4LoopCount++;
+            Attack4HoverTimer   = 0f;
+            Attack4LinesSpawned = false;
+            int dir             = Main.rand.NextBool() ? 1 : -1;
+            Attack4Part1Random  = dir * Main.rand.Next(3, 6) * 16;
+
+
+            if (Attack4LoopCount >= 4)
+            {
+                Attack4LoopCount  = 0f;
+                Attack4HoverTimer = 0f;
+                Attack4Angle      = 0f;
+                AITimer           = 0f;
+                AIState           = (float)ActionState.Attack3;
+            }
+        }
     }
-  
+}
+
+private void SpawnTelegraphLines(Player player)
+{
+    int lineCount   = 16;
+    int lineSpacing = 8 * 16;
+
+    for (int i = 0; i < lineCount; i++)
+    {
+        int x = (int)(NPC.Center.X + Attack4Part1Random - lineSpacing * (lineCount / 2) + i * lineSpacing);
+        Vector2 telePos = new Vector2(x, NPC.Center.Y - 550);
+
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),
+                telePos,
+                Vector2.Zero,
+                ModContent.ProjectileType<TelegraphLines>(),
+                0, 0, Main.myPlayer
+            );
+        }
+    }
+}
+
+private void SpawnLaserProjectiles(Player player)
+{
+    int lineCount   = 16;
+    int lineSpacing = 8 * 16;
+    int projSpeed   = 12;
+    int projDamage  = 20;
+
+    for (int i = 0; i < lineCount; i++)
+    {
+        int x = (int)(NPC.Center.X + Attack4Part1Random - lineSpacing * (lineCount / 2) + i * lineSpacing);
+        Vector2 projPos = new Vector2(x, NPC.Center.Y - 300);
+
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            int projType = Main.rand.Next(4) switch
+            {
+                0 => ModContent.ProjectileType<CycloneProjectile1>(),
+                1 => ModContent.ProjectileType<CycloneProjectile2>(),
+                2 => ModContent.ProjectileType<CycloneProjectile3>(),
+                _ => ModContent.ProjectileType<CycloneProjectile4>(),
+            };
+
+            Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),
+                projPos,
+                new Vector2(0, projSpeed),
+                projType,
+                projDamage, 2f, Main.myPlayer
+            );
+        }
+    }
 }
 
 }
