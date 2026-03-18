@@ -62,7 +62,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Projectile.height      = 16;
             Projectile.hostile     = true;
             Projectile.friendly    = false;
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.timeLeft    = 300;
             Projectile.aiStyle     = -1;
         }
@@ -81,7 +81,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Projectile.height      = 16;
             Projectile.hostile     = true;
             Projectile.friendly    = false;
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.timeLeft    = 300;
             Projectile.aiStyle     = -1;
         }
@@ -100,7 +100,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Projectile.height      = 16;
             Projectile.hostile     = true;
             Projectile.friendly    = false;
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.timeLeft    = 300;
             Projectile.aiStyle     = -1;
         }
@@ -119,7 +119,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Projectile.height      = 16;
             Projectile.hostile     = true;
             Projectile.friendly    = false;
-            Projectile.tileCollide = true;
+            Projectile.tileCollide = false;
             Projectile.timeLeft    = 300;
             Projectile.aiStyle     = -1;
         }

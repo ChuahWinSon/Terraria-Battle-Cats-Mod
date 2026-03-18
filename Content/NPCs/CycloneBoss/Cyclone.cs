@@ -24,6 +24,11 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Attack2,
             Attack3,
             Attack4,
+            Transform,
+            EnhancedAttack1,
+            EnhancedAttack2,
+            EnhancedAttack3,
+            EnhancedAttack4
         }
 
         public ref float AIState => ref NPC.ai[0];
@@ -106,6 +111,21 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Attack4:
                     Attack4();
                     break;
+                case (float)ActionState.Transform:
+                    Idle();
+                    break;
+                case (float)ActionState.EnhancedAttack1:
+                    Attack1();
+                    break;
+                case (float)ActionState.EnhancedAttack2:
+                    Attack2();
+                    break;
+                case (float)ActionState.EnhancedAttack3:
+                    Attack3();
+                    break;
+                case (float)ActionState.EnhancedAttack4:
+                    Attack4();
+                    break;
                 
 
             }
@@ -122,7 +142,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack4;
+                AIState = (float)ActionState.Attack2;
             }
         }
 
@@ -192,69 +212,123 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             }
         }
 
-    private float Attack2Angle = 0f;
-private Vector2 CycloneLaunchTarget = Vector2.Zero;
+
+private float Attack2OrbitAngle = 0f;
+private int   Attack2ShootTimer = 0;
+private float OrbitRadius2 = 400f;
+private const float OrbitSpeed2 = 0.02f;
 
 private void Attack2()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
 
-    if (AITimer == 1f)
+    // Phase 1: disappear (0-60 ticks)
+    if (AITimer < 60f)
     {
-        // Pick random angle, place all 3 (2 copies + boss) evenly around circle
-        Attack2Angle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-        CycloneLaunchTarget = player.Center; // store player pos once
+        NPC.velocity = Vector2.Zero;
+        NPC.alpha    = (int)MathHelper.Lerp(0, 255, AITimer / 60f);
+        return;
+        
+    }
 
-        float angle1 = Attack2Angle;
-        float angle2 = Attack2Angle + MathHelper.TwoPi / 3f;
-        float angle3 = Attack2Angle + MathHelper.TwoPi / 3f * 2f;
-
-        // Teleport main boss to its position
-        NPC.Center = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle1);
-        NPC.alpha  = 255;
+    // Phase 2: teleport to random position around player
+    if (AITimer == 61f)
+    {
+        Attack2OrbitAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+        NPC.Center        = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
+        NPC.alpha         = 255;
+        NPC.velocity      = Vector2.Zero;
+        NPC.netUpdate     = true;
 
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
-            NPC.NewNPC(NPC.GetSource_FromAI(), 
-                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle2)).X,
-                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle2)).Y,
-                ModContent.NPCType<CycloneClone>());
+            float clone1Angle = Attack2OrbitAngle + MathHelper.TwoPi / 3f;         // 120 degrees
+            float clone2Angle = Attack2OrbitAngle + MathHelper.TwoPi / 3f * 2f;    // 240 degrees
 
-            NPC.NewNPC(NPC.GetSource_FromAI(),
-                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle3)).X,
-                (int)(player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(angle3)).Y,
-                ModContent.NPCType<CycloneClone>());
+            Vector2 clone1Pos = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(clone1Angle);
+            Vector2 clone2Pos = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(clone2Angle);
+
+            int clone1Index = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clone1Pos.X, (int)clone1Pos.Y, ModContent.NPCType<CycloneClone>());
+            Main.npc[clone1Index].ai[1] = clone1Angle;
+            Main.npc[clone1Index].ai[2] = OrbitRadius2;
+            Main.npc[clone1Index].netUpdate = true;
+
+            int clone2Index = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clone2Pos.X, (int)clone2Pos.Y, ModContent.NPCType<CycloneClone>());
+            Main.npc[clone2Index].ai[1] = clone2Angle;
+            Main.npc[clone2Index].ai[2] = OrbitRadius2;
+            Main.npc[clone2Index].netUpdate = true;
         }
-        NPC.netUpdate = true;
+
     }
 
-    if (AITimer >= 1f)
+    // Phase 3: orbit continuously while shooting
+    if (AITimer >= 61f && AITimer < 360f)
     {
-        NPC.alpha = (int)MathHelper.Lerp(255, 0, (AITimer - 60f) / 60f);
-    }
+        // Fade in over first 60 ticks of orbit
+        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
 
-    if (AITimer <= 120f)
-    {
-        NPC.velocity = Vector2.Zero;
-        NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
+        Attack2OrbitAngle += OrbitSpeed2;
+
+        Vector2 targetPos     = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
+        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
+
+        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
+
+        // Shoot every 30 ticks
+        Attack2ShootTimer++;
+        if (Attack2ShootTimer >= 30)
+        {
+            Attack2ShootTimer = 0;
+
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                int projType = Main.rand.Next(4) switch
+                {
+                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
+                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
+                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
+                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
+                };
+
+                Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
+                int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    NPC.Center,
+                    shootDir * 12f,
+                    projType,
+                    damage,
+                    2f,
+                    Main.myPlayer
+                );
+            }
+        }
+
         return;
     }
 
-
-    // Dash toward stored player position
-    Vector2 launchDir = Vector2.Normalize(CycloneLaunchTarget - NPC.Center);
-    NPC.velocity = launchDir * 14f;
-
-    if (AITimer >= 180f)
+    // Phase 4: fade out and end
+    if (AITimer >= 360f && AITimer < 420f)
     {
-        NPC.alpha  = 0;
-        AITimer    = 0f;
-        CycloneLaunchTarget = Vector2.Zero;
-        AIState    = (float)ActionState.Idle;
+        NPC.alpha = (int)MathHelper.Lerp(0, 255, (AITimer - 360f) / 60f);
+        NPC.velocity *= 0.9f;
+        return;
+    }
+
+    if (AITimer >= 420f)
+    {
+        NPC.alpha         = 0;
+        AITimer           = 0f;
+        Attack2OrbitAngle = 0f;
+        Attack2ShootTimer = 0;
+        AIState           = (float)ActionState.Idle;
     }
 }
+
 private int ShootTimer = 0;
 
 private void Attack3()
@@ -477,8 +551,8 @@ public class CycloneClone : ModNPC
     public ref float AITimer => ref NPC.ai[0];
     private Vector2 LaunchTarget = Vector2.Zero;
     
-    private const int FadeInDuration = 120;
-    private const int TargetAlpha    = 160; // semi transparent, lower = more visible
+    private const int FadeInDuration = 59;
+    private const int TargetAlpha    = 200; // semi transparent, lower = more visible
 
     public override void SetDefaults()
     {
@@ -491,11 +565,13 @@ public class CycloneClone : ModNPC
         NPC.noTileCollide = true;
         NPC.knockBackResist = 0f;
         NPC.alpha         = 255; // start invisible
+        NPC.dontTakeDamage = true;
     }
 
     public override void SetStaticDefaults()
     {
         Main.npcFrameCount[NPC.type] = 29;
+        
     }
 
     
@@ -512,38 +588,72 @@ public class CycloneClone : ModNPC
         }
     }
 
+    private int   Attack2ShootTimer = 0;
+    private float OrbitRadius2 = 400f;
+    private const float OrbitSpeed2 = 0.02f;
+    private float Attack2OrbitAngle = 0f;
     public override void AI()
+{
+    Player player = Main.player[NPC.target];
+    NPC.TargetClosest(true);
+    AITimer++;
+
+    if (AITimer == 1f)
     {
-        AITimer++;
-        NPC.TargetClosest(true);
-        Player player = Main.player[NPC.target];
-
-        // Store player position once on first tick
-        if (AITimer == 1f)
-        {
-            LaunchTarget = player.Center;
-            NPC.netUpdate = true;
-        }
-
-        // Fade in to semi transparent
-        if (AITimer <= FadeInDuration)
-        {
-            NPC.alpha = (int)MathHelper.Lerp(255, TargetAlpha, AITimer / FadeInDuration);
-            NPC.velocity = Vector2.Zero;
-            NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
-            NPC.spriteDirection = NPC.direction;
-            return;
-        }
-
-        // Dash toward stored player position
-        Vector2 launchDir = Vector2.Normalize(LaunchTarget - NPC.Center);
-        NPC.velocity = launchDir * 14f;
-
-        if (AITimer >= 180f)
-            NPC.active = false;
-
-            
+        Attack2OrbitAngle = NPC.ai[1]; // use angle passed from boss
+        NPC.alpha         = 255;
+        NPC.velocity      = Vector2.Zero;
+        NPC.netUpdate     = true;
     }
+
+    // Orbit and shoot
+    if (AITimer >= 1f && AITimer < 300f)
+    {   
+        NPC.alpha = (int)MathHelper.Lerp(255, 200, Math.Min(AITimer / 60f, 1f));
+        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+        NPC.spriteDirection = NPC.direction;
+
+        Attack2OrbitAngle += OrbitSpeed2;
+
+        Vector2 targetPos     = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
+        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
+
+        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+        NPC.spriteDirection = NPC.direction;
+
+        Attack2ShootTimer++;
+        if (Attack2ShootTimer >= 30 && Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            Attack2ShootTimer = 0;
+
+            int projType = Main.rand.Next(4) switch
+            {
+                0 => ModContent.ProjectileType<CycloneProjectile1>(),
+                1 => ModContent.ProjectileType<CycloneProjectile2>(),
+                2 => ModContent.ProjectileType<CycloneProjectile3>(),
+                _ => ModContent.ProjectileType<CycloneProjectile4>(),
+            };
+
+            Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
+            int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+            Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 12f, projType, damage, 2f, Main.myPlayer);
+        }
+
+        return;
+    }
+
+    // Fade out
+    if (AITimer >= 300f && AITimer < 360f)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((AITimer - 300f) / 60f, 1f));
+        NPC.velocity *= 0.9f;
+        return;
+    }
+
+    if (AITimer >= 360f)
+        NPC.active = false;
+}
 }
 
 }
