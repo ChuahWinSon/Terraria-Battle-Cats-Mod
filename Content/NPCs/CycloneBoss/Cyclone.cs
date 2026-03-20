@@ -176,7 +176,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack2;
+                AIState = (float)ActionState.Attack4;
             }
         }
 
@@ -365,68 +365,142 @@ private void Attack2()
     }
 }
 
-private int ShootTimer = 0;
+private float OrbitRadius3    = 700f;
+private int   Attack3ShootTimer = 0;
+private const float Attack3Height = 200f; // total spread height of the 5 bullets
+private float Attack3SubAttack = 0f;
+private float Attack3StartY    = 0f;
+private float Attack3EndY      = 0f;
 
 private void Attack3()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
 
-    // Slowly move toward player
-    Vector2 toPlayer = Vector2.Normalize(player.Center - NPC.Center);
-    NPC.velocity = Vector2.Lerp(NPC.velocity, toPlayer * 3f, 0.05f);
-
-    // Face player
-    NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
-    NPC.spriteDirection = NPC.direction;
-
-    // Shoot every 30 ticks (0.5 seconds)
-    ShootTimer++;
-    if (ShootTimer >= 30)
+    // Phase 1: disappear
+    if (AITimer < 60f)
     {
-        ShootTimer = 0;
-
-        if (Main.netMode != NetmodeID.MultiplayerClient)
-        {
-            // Pick random projectile from 4 types
-            int projType = Main.rand.Next(4) switch
-            {
-                0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                _ => ModContent.ProjectileType<CycloneProjectile4>(),
-            };
-
-            Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-            int damage = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
-
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                NPC.Center,
-                shootDir * 10f,
-                projType,
-                damage,
-                2f,
-                Main.myPlayer
-            );
-        }
+        NPC.velocity = Vector2.Zero;
+        NPC.alpha    = (int)MathHelper.Lerp(0, 255, AITimer / 60f);
+        return;
     }
 
-    // End after 5 seconds
-    if (AITimer >= 300f)
+    // Phase 2: teleport to left of player
+    if (AITimer == 61f)
     {
-        ShootTimer = 0;
+        NPC.Center    = player.Center + new Vector2(-OrbitRadius3, 0f);
+        NPC.alpha     = 255;
+        NPC.velocity  = Vector2.Zero;
+        NPC.netUpdate = true;
+    }
+
+    // Phase 3: track player on left side and fire volleys
+    if (AITimer >= 61f && AITimer < 420f)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
+
+        float verticalOffset = 0f;
+        float yDiff = NPC.Center.Y - player.Center.Y;
+        if (Math.Abs(yDiff) < 20f)
+            verticalOffset = yDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 40f : -40f) : Math.Sign(yDiff) * 40f;
+
+        Vector2 targetPos     = new Vector2(player.Center.X - OrbitRadius3, player.Center.Y + verticalOffset);
+        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
+
+        NPC.direction       = 1;
+        NPC.spriteDirection = 1;
+
+        Attack3ShootTimer++;
+        if (Attack3ShootTimer >= 60)
+        {
+            Attack3ShootTimer = 0;
+            Attack3SubAttack  = Main.rand.Next(3);
+            PickAttack3Range(player);
+            FireWallVolley(player);
+        }
+
+        return;
+    }
+
+    // Phase 4: fade out
+    if (AITimer >= 420f && AITimer < 480f)
+    {
+        NPC.alpha    = (int)MathHelper.Lerp(0, 255, Math.Min((AITimer - 420f) / 60f, 1f));
+        NPC.velocity *= 0.9f;
+        return;
+    }
+
+    if (AITimer >= 480f)
+    {
+        NPC.alpha  = 0;
         AITimer    = 0f;
-        AIState    = (float)ActionState.Attack1;
+        AIState    = (float)ActionState.Idle;
     }
 }
 
+
+private void PickAttack3Range(Player player)
+{
+    switch ((int)Attack3SubAttack)
+    {
+        case 0: // middle
+            Attack3StartY = player.Center.Y - Attack3Height / 2f;
+            Attack3EndY   = player.Center.Y + Attack3Height / 2f;
+            break;
+        case 1: // upper
+            Attack3StartY = player.Center.Y - Attack3Height;
+            Attack3EndY   = player.Center.Y;
+            break;
+        case 2: // lower
+            Attack3StartY = player.Center.Y;
+            Attack3EndY   = player.Center.Y + Attack3Height;
+            break;
+    }
+}
+
+private void FireWallVolley(Player player)
+{
+    if (Main.netMode == NetmodeID.MultiplayerClient) return;
+
+    int   bulletCount = 5;
+    float speed       = 10f;
+    int   damage      = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+
+    for (int i = 0; i < bulletCount; i++)
+    {
+        float t      = (float)i / (bulletCount - 1); // 0 to 1
+        float spawnY = MathHelper.Lerp(Attack3StartY, Attack3EndY, t);
+
+        Vector2 spawnPos = new Vector2(NPC.Center.X, spawnY);
+
+        int projType = Main.rand.Next(4) switch
+        {
+            0 => ModContent.ProjectileType<CycloneProjectile1>(),
+            1 => ModContent.ProjectileType<CycloneProjectile2>(),
+            2 => ModContent.ProjectileType<CycloneProjectile3>(),
+            _ => ModContent.ProjectileType<CycloneProjectile4>(),
+        };
+
+        Projectile.NewProjectile(
+            NPC.GetSource_FromAI(),
+            spawnPos,
+            new Vector2(speed, 0f),
+            projType,
+            damage,
+            2f,
+            Main.myPlayer
+        );
+    }
+}
 
 private float Attack4LoopCount = 0f;
 private bool  Attack4LinesSpawned = false;
 private int   Attack4Part1Random = 0;
 private float Attack4Angle     = 0f;
 private float Attack4HoverTimer = 0f;
+private float Attack4ShootTimer = 0f;
+private float OrbitRadius4 = 500f;
 
 private void Attack4()
 {
@@ -445,7 +519,7 @@ private void Attack4()
     if (AITimer == 61f)
     {
         Attack4Angle          = MathHelper.PiOver2;
-        NPC.Center            = player.Center + new Vector2(0f, OrbitRadius);
+        NPC.Center            = player.Center + new Vector2(0f, OrbitRadius4);
         NPC.alpha             = 255;
         NPC.velocity          = Vector2.Zero;
         Attack4LinesSpawned   = false;
@@ -463,7 +537,7 @@ private void Attack4()
         NPC.alpha    = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
         Attack4Angle -= OrbitSpeed;
 
-        Vector2 idealPos      = player.Center + new Vector2(OrbitRadius, 0f).RotatedBy(Attack4Angle);
+        Vector2 idealPos      = player.Center + new Vector2(OrbitRadius4, 0f).RotatedBy(Attack4Angle);
         Vector2 idealVelocity = Vector2.Normalize(idealPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, idealPos) / 8f, 2f, 20f);
         NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
 
@@ -482,7 +556,7 @@ private void Attack4()
         if (Math.Abs(xDiff) < 20f)
             horizontalOffset = xDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 140f : -140f) : Math.Sign(xDiff) * 40f;
 
-        Vector2 targetPos     = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - OrbitRadius);
+        Vector2 targetPos     = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - OrbitRadius4);
         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
         NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
 
@@ -496,10 +570,40 @@ private void Attack4()
             SpawnTelegraphLines(player);
         }
         // Fire lasers 40 ticks after telegraph
-        if (Attack4HoverTimer == 120f && !Attack4LinesSpawned)
+        if (Attack4HoverTimer == 90f && !Attack4LinesSpawned)
         {
             SpawnLaserProjectiles(player);
             Attack4LinesSpawned = true;
+        }
+
+        Attack4ShootTimer++;
+        if (Attack4ShootTimer >= 50)
+        {
+            Attack4ShootTimer = 0;
+
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                int projType = Main.rand.Next(4) switch
+                {
+                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
+                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
+                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
+                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
+                };
+
+                Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
+                int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    NPC.Center,
+                    shootDir * 10f,
+                    projType,
+                    damage,
+                    2f,
+                    Main.myPlayer
+                );
+            }
         }
 
         // Each loop: wait 120 ticks then repeat
@@ -596,8 +700,9 @@ private void SpawnLaserProjectiles(Player player)
         if (AITimer >= 120f)
         {
             AITimer = 0f;
-            AIState = (float)ActionState.Attack2;
+            AIState = (float)ActionState.EnhancedAttack2;
         }
+        
     }
 
 }

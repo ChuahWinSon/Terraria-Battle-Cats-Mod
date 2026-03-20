@@ -685,7 +685,7 @@ private void Attack2()
             for (int i = 0; i < lineCount; i++)
             {
                 int x = (int)(NPC.Center.X + Attack4Part1Random- lineSpacing * (lineCount / 2) + i * lineSpacing);
-                Vector2 projPos = new Vector2(x, NPC.Center.Y + 500);
+                Vector2 projPos = new Vector2(x, NPC.Center.Y + 550);
 
                 if (Main.netMode != NetmodeID.MultiplayerClient)
                 {
