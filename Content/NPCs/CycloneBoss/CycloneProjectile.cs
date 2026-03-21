@@ -70,26 +70,29 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void AI()
         {
 
-        float speed = Projectile.velocity.Length();
-            // Converging spread logic
-        if (Projectile.ai[0] == 1f)
-        {
-            float currentOffset = Projectile.ai[1];
-
-            // Lerp offset toward 0 over 30 ticks (0.5 seconds)
-            Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
-
-            // Recalculate velocity direction based on current offset
-            float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
-            Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
-        }
-
             Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+            
 
-        if (speed < 10f) // max speed cap
-        {
-            Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
-        }
+        // float speed = Projectile.velocity.Length();
+        //     // Converging spread logic
+        // if (Projectile.ai[0] == 1f)
+        // {
+        //     float currentOffset = Projectile.ai[1];
+
+        //     // Lerp offset toward 0 over 30 ticks (0.5 seconds)
+        //     Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
+
+        //     // Recalculate velocity direction based on current offset
+        //     float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
+        //     Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
+        // }
+
+        //     Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+
+        // if (speed < 10f) // max speed cap
+        // {
+        //     Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
+        // }
         }
     }
 
@@ -109,24 +112,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void AI()
         {
         
-        float speed = Projectile.velocity.Length();
-        // Converging spread logic
-        if (Projectile.ai[0] == 1f)
-        {
-            float currentOffset = Projectile.ai[1];
+        Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
-            // Lerp offset toward 0 over 30 ticks (0.5 seconds)
-            Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
-
-            // Recalculate velocity direction based on current offset
-            float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
-            Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
-        }
-            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
-        if (speed < 10f) // max speed cap
-        {
-            Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
-        }
         }
     }
 
@@ -146,25 +133,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void AI()
         {
             
-            float speed = Projectile.velocity.Length();
-            // Converging spread logic
-            if (Projectile.ai[0] == 1f)
-            {
-                float currentOffset = Projectile.ai[1];
-
-                // Lerp offset toward 0 over 30 ticks (0.5 seconds)
-                Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
-
-                // Recalculate velocity direction based on current offset
-                float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
-                Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
-            }
             Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
-            if (speed < 10f) // max speed cap
-            {
-                Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
-            }
         }
     }
 
@@ -184,27 +154,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void AI()
         {
 
-            float speed = Projectile.velocity.Length();
-    
-
-            // Converging spread logic
-            if (Projectile.ai[0] == 1f)
-            {
-                float currentOffset = Projectile.ai[1];
-
-                // Lerp offset toward 0 over 30 ticks (0.5 seconds)
-                Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
-
-                // Recalculate velocity direction based on current offset
-                float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
-                Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
-            }
             Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
-            if (speed < 10f) // max speed cap
-            {
-                Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
-            }
         }
     }
 
