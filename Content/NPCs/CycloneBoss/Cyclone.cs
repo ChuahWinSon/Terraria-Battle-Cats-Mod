@@ -184,7 +184,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack2;
+                AIState = (float)ActionState.Attack3;
             }
         }
 
