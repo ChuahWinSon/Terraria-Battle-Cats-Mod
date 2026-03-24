@@ -108,6 +108,11 @@ Items: {
 		Tooltip: ""
 		DisplayName: Platinum Cat Ticket
 	}
+
+	ExampleAdvancedFlail: {
+		Tooltip: ""
+		DisplayName: Example Advanced Flail
+	}
 }
 
 Buffs: {
@@ -201,6 +206,8 @@ Projectiles: {
 	CycloneProjectile2.DisplayName: Cyclone Projectile2
 	CycloneProjectile1.DisplayName: Cyclone Projectile1
 	CycloneTelegraph.DisplayName: Cyclone Telegraph
+	TelegraphLines.DisplayName: Telegraph Lines
+	ExampleAdvancedFlailProjectile.DisplayName: Example Advanced Flail Projectile
 }
 
 Dialogue: {
