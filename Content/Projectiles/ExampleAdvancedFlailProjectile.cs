@@ -17,10 +17,9 @@ namespace TheBattleCats.Content.Projectiles
 	public class ExampleAdvancedFlailProjectile : ModProjectile
 	{
 		private const string ChainTexturePath = "TheBattleCats/Content/Projectiles/ExampleAdvancedFlailProjectileChain"; // The folder path to the flail chain sprite
-		private const string ChainTextureExtraPath = "TheBattleCats/Content/Projectiles/ExampleAdvancedFlailProjectileChainExtra";  // This texture and related code is optional and used for a unique effect
 
 		private static Asset<Texture2D> chainTexture;
-		private static Asset<Texture2D> chainTextureExtra; // This texture and related code is optional and used for a unique effect
+		
 
 		private enum AIState
 		{
@@ -44,7 +43,6 @@ namespace TheBattleCats.Content.Projectiles
 
 		public override void Load() {
 			chainTexture = ModContent.Request<Texture2D>(ChainTexturePath);
-			chainTextureExtra = ModContent.Request<Texture2D>(ChainTextureExtraPath);
 		}
 
 		public override void SetStaticDefaults() {
@@ -82,7 +80,6 @@ namespace TheBattleCats.Content.Projectiles
 			}
 
 			Vector2 mountedCenter = player.MountedCenter;
-			bool doFastThrowDust = false;
 			bool shouldOwnerHitCheck = false;
 			int launchTimeLimit = 15;  // How much time the projectile can go before retracting (speed and shootTimer will set the flail's range)
 			float launchSpeed = 14f; // How fast the projectile can move
@@ -144,7 +141,6 @@ namespace TheBattleCats.Content.Projectiles
 						break;
 					}
 				case AIState.LaunchingForward: {
-						doFastThrowDust = true;
 						bool shouldSwitchToRetracting = StateTimer++ >= launchTimeLimit;
 						shouldSwitchToRetracting |= Projectile.Distance(mountedCenter) >= maxLaunchLength;
 						if (player.controlUseItem) // If the player clicks, transition to the Dropping state
@@ -438,7 +434,8 @@ namespace TheBattleCats.Content.Projectiles
 			float chainHeightAdjustment = 0f; // Use this to adjust the chain overlap. 
 
 			Vector2 chainOrigin = chainSourceRectangle.HasValue ? (chainSourceRectangle.Value.Size() / 2f) : (chainTexture.Size() / 2f);
-			Vector2 chainDrawPosition = Projectile.Center;
+			Vector2 offset = Projectile.rotation.ToRotationVector2().RotatedBy(-MathHelper.PiOver2) * 30f;
+			Vector2 chainDrawPosition = Projectile.Center + offset;
 			Vector2 vectorFromProjectileToPlayerArms = playerArmPosition.MoveTowards(chainDrawPosition, 4f) - chainDrawPosition;
 			Vector2 unitVectorFromProjectileToPlayerArms = vectorFromProjectileToPlayerArms.SafeNormalize(Vector2.Zero);
 			float chainSegmentLength = (chainSourceRectangle.HasValue ? chainSourceRectangle.Value.Height : chainTexture.Height()) + chainHeightAdjustment;
@@ -459,27 +456,7 @@ namespace TheBattleCats.Content.Projectiles
 				// This example shows how Flaming Mace works. It checks chainCount and changes chainTexture and draw color at different values
 
 				var chainTextureToDraw = chainTexture;
-				if (chainCount >= 4) {
-					// Use normal chainTexture and lighting, no changes
-				}
-				else if (chainCount >= 2) {
-					// Near to the ball, we draw a custom chain texture and slightly make it glow if unlit.
-					chainTextureToDraw = chainTextureExtra;
-					byte minValue = 140;
-					if (chainDrawColor.R < minValue)
-						chainDrawColor.R = minValue;
 
-					if (chainDrawColor.G < minValue)
-						chainDrawColor.G = minValue;
-
-					if (chainDrawColor.B < minValue)
-						chainDrawColor.B = minValue;
-				}
-				else {
-					// Close to the ball, we draw a custom chain texture and draw it at full brightness glow.
-					chainTextureToDraw = chainTextureExtra;
-					chainDrawColor = Color.White;
-				}
 
 				// Here, we draw the chain texture at the coordinates
 				Main.spriteBatch.Draw(chainTextureToDraw.Value, chainDrawPosition - Main.screenPosition, chainSourceRectangle, chainDrawColor, chainRotation, chainOrigin, 1f, SpriteEffects.None, 0f);
