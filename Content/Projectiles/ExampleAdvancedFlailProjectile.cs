@@ -56,7 +56,7 @@ namespace TheBattleCats.Content.Projectiles
 		public override void SetDefaults() {
 			Projectile.netImportant = true; // This ensures that the projectile is synced when other players join the world.
 			Projectile.width = 66; // The width of your projectile
-			Projectile.height = 80; // The height of your projectile
+			Projectile.height = 40; // The height of your projectile
 			Projectile.friendly = true; // Deals damage to enemies
 			Projectile.penetrate = -1; // Infinite pierce
 			Projectile.DamageType = DamageClass.Melee; // Deals melee damage
@@ -111,35 +111,49 @@ namespace TheBattleCats.Content.Projectiles
 
 			switch (CurrentAIState) {
 				case AIState.Spinning: {
-						shouldOwnerHitCheck = true;
-						if (Projectile.owner == Main.myPlayer) {
-							Vector2 unitVectorTowardsMouse = mountedCenter.DirectionTo(Main.MouseWorld).SafeNormalize(Vector2.UnitX * player.direction);
-							player.ChangeDir((unitVectorTowardsMouse.X > 0f).ToDirectionInt());
-							if (!player.channel) // If the player releases then change to moving forward mode
-							{
-								CurrentAIState = AIState.LaunchingForward;
-								StateTimer = 0f;
-								Projectile.velocity = unitVectorTowardsMouse * launchSpeed + player.velocity;
-								Projectile.Center = mountedCenter;
-								Projectile.netUpdate = true;
-								Projectile.ResetLocalNPCHitImmunity();
-								Projectile.localNPCHitCooldown = movingHitCooldown;
-								break;
-							}
+					shouldOwnerHitCheck = true;
+					if (Projectile.owner == Main.myPlayer) {
+						Vector2 unitVectorTowardsMouse = mountedCenter.DirectionTo(Main.MouseWorld).SafeNormalize(Vector2.UnitX * player.direction);
+						player.ChangeDir((unitVectorTowardsMouse.X > 0f).ToDirectionInt());
+						if (!player.channel) {
+							CurrentAIState = AIState.LaunchingForward;
+							StateTimer = 0f;
+							Projectile.velocity = unitVectorTowardsMouse * launchSpeed + player.velocity;
+							Projectile.Center = mountedCenter;
+							Projectile.netUpdate = true;
+							Projectile.ResetLocalNPCHitImmunity();
+							Projectile.localNPCHitCooldown = movingHitCooldown;
+							break;
 						}
-						SpinningStateTimer += 1f;
-						// This line creates a unit vector that is constantly rotated around the player. 10f controls how fast the projectile visually spins around the player
-						Vector2 offsetFromPlayer = new Vector2(player.direction).RotatedBy((float)Math.PI * 10f * (SpinningStateTimer / 60f) * player.direction);
-
-						offsetFromPlayer.Y *= 0.8f;
-						if (offsetFromPlayer.Y * player.gravDir > 0f) {
-							offsetFromPlayer.Y *= 0.5f;
-						}
-						Projectile.Center = mountedCenter + offsetFromPlayer * 30f + new Vector2(0, player.gfxOffY);
-						Projectile.velocity = Vector2.Zero;
-						Projectile.localNPCHitCooldown = spinHitCooldown; // set the hit speed to the spinning hit speed
-						break;
 					}
+
+					SpinningStateTimer += 1f;
+
+					// How many frames one full left-to-right-to-left swing takes
+					float swingPeriod = 180f;
+
+					// Sine goes from -1 to 1, giving the pendulum ease naturally
+					float rawSine = (float)Math.Sin(SpinningStateTimer / swingPeriod * Math.PI * 2f);
+
+					// Preserve the sign, then raise to a power - higher power = slower at peaks
+					float sineValue = Math.Sign(rawSine) * (float)Math.Pow(Math.Abs(rawSine), 0.4f);
+
+					// 160 degrees total arc = 80 degrees each side, converted to radians
+					float halfArc = MathHelper.ToRadians(80f);
+
+					// The current angle offset from straight down (or whatever base direction you want)
+					float swingAngle = sineValue * halfArc;
+
+					// Base direction: straight down relative to the player
+					// Rotate it by the swing angle, flipped by player direction so it mirrors correctly
+					Vector2 baseDirection = new Vector2(1f * player.direction, 0f);
+					Vector2 offsetFromPlayer = baseDirection.RotatedBy(swingAngle * player.direction);
+
+					Projectile.Center = mountedCenter + offsetFromPlayer * 60f + new Vector2(0, player.gfxOffY);
+					Projectile.velocity = Vector2.Zero;
+					Projectile.localNPCHitCooldown = spinHitCooldown;
+					break;
+				}
 				case AIState.LaunchingForward: {
 						bool shouldSwitchToRetracting = StateTimer++ >= launchTimeLimit;
 						shouldSwitchToRetracting |= Projectile.Distance(mountedCenter) >= maxLaunchLength;
@@ -434,7 +448,7 @@ namespace TheBattleCats.Content.Projectiles
 			float chainHeightAdjustment = 0f; // Use this to adjust the chain overlap. 
 
 			Vector2 chainOrigin = chainSourceRectangle.HasValue ? (chainSourceRectangle.Value.Size() / 2f) : (chainTexture.Size() / 2f);
-			Vector2 offset = Projectile.rotation.ToRotationVector2().RotatedBy(-MathHelper.PiOver2) * 30f;
+			Vector2 offset = Projectile.rotation.ToRotationVector2().RotatedBy(-MathHelper.PiOver2) * 14f;
 			Vector2 chainDrawPosition = Projectile.Center + offset;
 			Vector2 vectorFromProjectileToPlayerArms = playerArmPosition.MoveTowards(chainDrawPosition, 4f) - chainDrawPosition;
 			Vector2 unitVectorFromProjectileToPlayerArms = vectorFromProjectileToPlayerArms.SafeNormalize(Vector2.Zero);

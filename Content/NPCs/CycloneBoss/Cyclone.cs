@@ -60,12 +60,25 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private const int CloneOffset = 100; // pixels left/right, tune this
         private const int CloneAlpha  = 200; // transparency, tune this
 
+        private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
+        {
+            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+        };
+
+        private static readonly SoundStyle CycloneRoarDrag = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarDrag")
+        {
+            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+        };
+
+        private static readonly SoundStyle CycloneRoarGor = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarGor")
+        {
+            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+        };
         public override void SetStaticDefaults()
         {
             Main.npcFrameCount[NPC.type] = 29;
         }
 
-      
 
         public override void FindFrame(int frameHeight)
         {
@@ -108,6 +121,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         //     return false;
         // }
+
 
         private bool HasTransitioned = false;
         private bool PendingTransform = false;
@@ -758,7 +772,7 @@ private void EnhancedAttack1()
     // Phase 2: teleport above player
     if (AITimer == 61f)
     {
-        NPC.Center = player.Center + new Vector2(Main.rand.NextFloat(-300f, 300f), -300f);
+        NPC.Center = player.Center + new Vector2(Main.rand.NextFloat(-300f, 300f), -240f);
         NPC.alpha     = 255;
         NPC.velocity  = Vector2.Zero;
         NPC.netUpdate = true;
@@ -777,6 +791,7 @@ private void EnhancedAttack1()
                 int cloneIndex   = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePos.X, (int)clonePos.Y, ModContent.NPCType<CycloneClone>());
                 Main.npc[cloneIndex].ai[1] = 1f;
                 Main.npc[cloneIndex].netUpdate = true;
+                SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
             EnhancedAttack1CloneCount ++;
         }
@@ -812,6 +827,7 @@ private void EnhancedAttack1()
                 NPC.alpha                 = 0;
                 AITimer                   = 0f;
                 EnhancedAttack1CloneCount = 0;
+                EnhancedAttack1CloneTimer = 0;
 
 
                 AIState    = (float)ActionState.EnhancedAttack2;
@@ -937,6 +953,7 @@ private void EnhancedAttack2()
                     2f,
                     Main.myPlayer
                 );
+                SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
         }
 
@@ -1077,15 +1094,19 @@ private void FireEnhancedWallVolley(Player player)
             _ => ModContent.ProjectileType<CycloneProjectile4>(),
         };
 
-        Projectile.NewProjectile(
-            NPC.GetSource_FromAI(),
-            spawnPos,
-            new Vector2(speed, 0f),
-            projType,
-            damage,
-            2f,
-            Main.myPlayer
-        );
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),
+                spawnPos,
+                new Vector2(speed, 0f),
+                projType,
+                damage,
+                2f,
+                Main.myPlayer
+            );
+            SoundEngine.PlaySound(ProjectileSound, NPC.Center);
+        }
     }
 }
 
@@ -1151,7 +1172,7 @@ private void EnhancedAttack4()
             horizontalOffset = xDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 140f : -140f) : Math.Sign(xDiff) * 40f;
 
         Vector2 targetPos     = new Vector2(player.Center.X + horizontalOffset, player.Center.Y - EnhancedOrbitRadius4);
-        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 8f);
         NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
 
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
@@ -1195,6 +1216,7 @@ private void EnhancedAttack4()
                     2f,
                     Main.myPlayer
                 );
+                SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
         }
 
@@ -1282,6 +1304,11 @@ public class CycloneClone : ModNPC
     
     private const int FadeInDuration = 59;
     private const int TargetAlpha    = 200; // semi transparent, lower = more visible
+
+    private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
+    {
+        PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+    };
 
     public override void SetDefaults()
     {
@@ -1441,6 +1468,7 @@ private void DoAttack2()
                 2 => ModContent.ProjectileType<CycloneProjectile3>(),
                 _ => ModContent.ProjectileType<CycloneProjectile4>(),
             };
+            SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
             Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
             int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
@@ -1536,6 +1564,7 @@ private void DoAttack3()
                         2 => ModContent.ProjectileType<CycloneProjectile3>(),
                         _ => ModContent.ProjectileType<CycloneProjectile4>(),
                     };
+                    SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
                     Projectile.NewProjectile(NPC.GetSource_FromAI(),
                         new Vector2(NPC.Center.X, spawnY),
@@ -1601,6 +1630,7 @@ private void DoAttack4()
             2 => ModContent.ProjectileType<CycloneProjectile3>(),
             _ => ModContent.ProjectileType<CycloneProjectile4>(),
         };
+        SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
         Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
         int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
