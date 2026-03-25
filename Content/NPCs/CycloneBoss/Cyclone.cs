@@ -735,14 +735,17 @@ private void SpawnLaserProjectiles(Player player)
 
 private float EnhancedAttack1HoverTimer = 0f;
 private int   EnhancedAttack1ShootTimer = 0;
-private const int   EnhancedAttack1Loops    = 10;   // how many volleys before ending
+private const int   EnhancedAttack1Loops    = 20;   // how many volleys before ending
 private float EnhancedAttack1LoopCount  = 0f;
 private float EnhancedAttack1BobTimer   = 0f;      // for the subtle bobbing
+private float EnhancedAttack1CloneTimer = 0f;
 
+private int EnhancedAttack1CloneCount = 0;
 private void EnhancedAttack1()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
+    EnhancedAttack1CloneTimer++;
 
     // Phase 1: disappear
     if (AITimer < 60f)
@@ -755,24 +758,28 @@ private void EnhancedAttack1()
     // Phase 2: teleport above player
     if (AITimer == 61f)
     {
-        NPC.Center = player.Center + new Vector2(Main.rand.NextFloat(-300f, 300f), -150f);
+        NPC.Center = player.Center + new Vector2(Main.rand.NextFloat(-300f, 300f), -300f);
         NPC.alpha     = 255;
         NPC.velocity  = Vector2.Zero;
         NPC.netUpdate = true;
 
     }
 
-    if (AITimer == 181f)
-    {
-        if (Main.netMode != NetmodeID.MultiplayerClient)
+    
+
+    if (EnhancedAttack1CloneTimer >= 241f && EnhancedAttack1CloneCount < 2)
         {
-            float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-            Vector2 clonePos = player.Center + new Vector2(300f, 0f).RotatedBy(cloneAngle);
-            int cloneIndex   = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePos.X, (int)clonePos.Y, ModContent.NPCType<CycloneClone>());
-            Main.npc[cloneIndex].ai[1] = 1f;
-            Main.npc[cloneIndex].netUpdate = true;
+            EnhancedAttack1CloneTimer  = 0f;
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+                Vector2 clonePos = player.Center + new Vector2(300f, 0f).RotatedBy(cloneAngle);
+                int cloneIndex   = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePos.X, (int)clonePos.Y, ModContent.NPCType<CycloneClone>());
+                Main.npc[cloneIndex].ai[1] = 1f;
+                Main.npc[cloneIndex].netUpdate = true;
+            }
+            EnhancedAttack1CloneCount ++;
         }
-    }
     // Phase 3: hover and rain projectiles
     if (AITimer >= 61f)
     {
@@ -804,6 +811,7 @@ private void EnhancedAttack1()
                 EnhancedAttack1BobTimer   = 0f;
                 NPC.alpha                 = 0;
                 AITimer                   = 0f;
+                EnhancedAttack1CloneCount = 0;
 
 
                 AIState    = (float)ActionState.EnhancedAttack2;
@@ -816,7 +824,7 @@ private void EnhancedAttack1()
 
 private void SpawnRainVolley(Player player)
 {
-    int   count   = 2;   // projectiles per volley
+    int   count   = 3;   // projectiles per volley
     int   damage  = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
     for (int i = 0; i < count; i++)
@@ -1602,7 +1610,7 @@ private void DoAttack4()
 
     if (AITimer >= 80f && AITimer < 140f)
     {
-        NPC.alpha    = (int)MathHelper.Lerp(160, 255, Math.Min((AITimer - 140f) / 60f, 1f));
+        NPC.alpha    = (int)MathHelper.Lerp(160, 255, Math.Min((AITimer - 80f) / 60f, 1f));
         NPC.velocity *= 0.9f;
         return;
     }
