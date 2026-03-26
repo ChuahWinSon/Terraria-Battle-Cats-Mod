@@ -1272,7 +1272,53 @@ private void EnhancedAttack4()
             }
         }
     }
+
+
+
+
 }
+
+#region Networking
+public override void SendExtraAI(System.IO.BinaryWriter writer)
+{
+    writer.Write(HasTransitioned);
+    writer.Write(PendingTransform);
+
+    // Random picks clients can't reproduce
+    writer.Write(OrbitAngle);          // Main.rand.NextFloat on server
+    writer.Write(Attack2OrbitAngle);
+    writer.Write(Attack4Angle);
+    writer.Write(Attack4Part1Random);  // random direction * random int
+
+    writer.Write(EnhancedAttack2OrbitAngle);
+    writer.Write(EnhancedAttack4Angle);
+    writer.Write(EnhancedAttack4Part1Random);
+
+    // LaunchDirection is calculated from NPC.Center → player.Center
+    // but it's only set once and then held, so sync it
+    writer.Write(LaunchDirection.X);
+    writer.Write(LaunchDirection.Y);
+}
+
+public override void ReceiveExtraAI(System.IO.BinaryReader reader)
+{
+    HasTransitioned = reader.ReadBoolean();
+    PendingTransform = reader.ReadBoolean();
+
+    OrbitAngle = reader.ReadSingle();
+    Attack2OrbitAngle = reader.ReadSingle();
+    Attack4Angle = reader.ReadSingle();
+    Attack4Part1Random = reader.ReadInt32();
+
+    EnhancedAttack2OrbitAngle = reader.ReadSingle();
+    EnhancedAttack4Angle = reader.ReadSingle();
+    EnhancedAttack4Part1Random = reader.ReadInt32();
+
+    LaunchDirection = new Vector2(reader.ReadSingle(), reader.ReadSingle());
+}
+
+#endregion Networking
+
 
 }
 
@@ -1651,5 +1697,6 @@ private void DoAttack4()
 
 
 }
+
 
 }
