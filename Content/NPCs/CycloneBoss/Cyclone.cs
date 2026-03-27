@@ -941,7 +941,7 @@ private void EnhancedAttack2()
                     2f,
                     Main.myPlayer
                 );
-                
+
                 SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
         }
@@ -965,7 +965,6 @@ private void EnhancedAttack2()
 }
 
 private float EnhancedOrbitRadius3    = 600f;
-private int   EnhancedAttack3ShootTimer = 0;
 private const float EnhancedAttack3Height = 160f;
 private float EnhancedAttack3SubAttack = 0f;
 private float EnhancedAttack3StartY    = 0f;
@@ -1019,11 +1018,15 @@ private void EnhancedAttack3()
         NPC.direction       = 1;
         NPC.spriteDirection = 1;
 
-        EnhancedAttack3ShootTimer++;
-        if (EnhancedAttack3ShootTimer >= 70)
+        AttackTimer++;
+        if (AttackTimer >= 70)
         {
-            EnhancedAttack3ShootTimer = 0;
-            EnhancedAttack3SubAttack  = Main.rand.Next(3);
+            AttackTimer = 0;
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                EnhancedAttack3SubAttack = Main.rand.Next(3);
+                NPC.netUpdate = true;
+            }
             PickEnhancedAttack3Range(player);
             FireEnhancedWallVolley(player);
         }
@@ -1035,7 +1038,7 @@ private void EnhancedAttack3()
     {
         NPC.alpha  = 0;
         AITimer    = 0f;
-        EnhancedAttack3ShootTimer   = 0;
+        AttackTimer   = 0;
         AIState    = (float)ActionState.Reset;
 
         NPC.netUpdate = true;
@@ -1100,17 +1103,12 @@ private void FireEnhancedWallVolley(Player player)
     }
 }
 
-private float EnhancedAttack4LoopCount = 0f;
-private bool  EnhancedAttack4LinesSpawned = false;
-private int   EnhancedAttack4Part1Random = 0;
-private float EnhancedAttack4Angle     = 0f;
-private float EnhancedAttack4HoverTimer = 0f;
-private float EnhancedAttack4ShootTimer = 0f;
+
+
+
 private float EnhancedOrbitRadius4 = 400f;
 private int EnhancedAttack4CloneSequence = 0; // 0=topleft, 1=topright, 2=botleft, 3=botright
-private float EnhancedAttack4CloneTimer = 0f;
 
-private int EnhancedAttack4CloneCount = 0;
 private void EnhancedAttack4()
 {
     Player player = Main.player[NPC.target];
@@ -1125,34 +1123,16 @@ private void EnhancedAttack4()
 
     if (AITimer == 61f)
     {
-        EnhancedAttack4Angle          = MathHelper.PiOver2;
-        NPC.Center                    = player.Center + new Vector2(0f, EnhancedOrbitRadius4);
-        NPC.alpha                     = 255;
-        NPC.velocity                  = Vector2.Zero;
-        EnhancedAttack4LinesSpawned   = false;
-        int dir                       = Main.rand.NextBool() ? 1 : -1;
-        EnhancedAttack4Part1Random    = dir * Main.rand.Next(3, 6) * 16;
-        NPC.netUpdate                 = true;
-
+        NPC.Center                 = player.Center + new Vector2(0f, -EnhancedOrbitRadius4); // tp straight to top
+        NPC.alpha                  = 0;
+        NPC.velocity               = Vector2.Zero;
+        NPC.netUpdate              = true;
     }
 
-    float targetAngle = -MathHelper.PiOver2;
-    if (AITimer >= 61f && EnhancedAttack4Angle > targetAngle)
-    {
-        NPC.alpha             = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
-        EnhancedAttack4Angle -= OrbitSpeed;
 
-        Vector2 idealPos      = player.Center + new Vector2(EnhancedOrbitRadius4, 0f).RotatedBy(EnhancedAttack4Angle);
-        Vector2 idealVelocity = Vector2.Normalize(idealPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, idealPos) / 8f, 2f, 20f);
-        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
-
-        NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
-        NPC.spriteDirection = NPC.direction;
-        return;
-    }
-
-    if (AITimer >= 61f && EnhancedAttack4Angle <= targetAngle)
+    if (AITimer >= 61f)
     {   
+        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
 
         NPC.alpha = 0;
 
@@ -1168,21 +1148,19 @@ private void EnhancedAttack4()
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
 
-        EnhancedAttack4HoverTimer++;
+        AttackTimer++;
 
-        if (EnhancedAttack4HoverTimer == 60f && !EnhancedAttack4LinesSpawned)
+        if (AttackTimer % 210f == 181 && AttackTimer > 2 && AttackTimer < 850) //&& AttackTimer > 2 prevents insta spawn
             SpawnTelegraphLines(player);
 
-        if (EnhancedAttack4HoverTimer == 90f && !EnhancedAttack4LinesSpawned)
+        if (AttackTimer % 210f == 1 && AttackTimer > 2 && AttackTimer < 850) //30 frame gap
         {
             SpawnLaserProjectiles(player);
-            EnhancedAttack4LinesSpawned = true;
         }
 
-        EnhancedAttack4ShootTimer++;
-        if (EnhancedAttack4ShootTimer >= 50)
+
+        if (AttackTimer % 50 == 1 && AttackTimer > 2)
         {
-            EnhancedAttack4ShootTimer = 0;
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
@@ -1210,12 +1188,13 @@ private void EnhancedAttack4()
             }
         }
 
-        EnhancedAttack4CloneTimer++;
+
+        CloneTimer++;
+        
 
         // Spawn next clone 
-        if (EnhancedAttack4CloneTimer >= 180f && EnhancedAttack4CloneCount < 4)
+        if (CloneTimer % 210f == 200 && CloneTimer < 850 && CloneTimer > 2) //spawn 4 , and prevent insta spawn
         {
-            EnhancedAttack4CloneTimer  = 0f;
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
@@ -1233,40 +1212,30 @@ private void EnhancedAttack4()
                 Main.npc[cloneIndex].netUpdate = true;
 
                 EnhancedAttack4CloneSequence = (EnhancedAttack4CloneSequence + 1) % 4;
-                EnhancedAttack4CloneCount ++;
             }
         }
 
-        if (EnhancedAttack4HoverTimer >= 360f)
+        if (AttackTimer >= 1000f)
         {
-            EnhancedAttack4LoopCount++;
-            EnhancedAttack4HoverTimer   = 0f;
-            EnhancedAttack4LinesSpawned = false;
-            int dir                     = Main.rand.NextBool() ? 1 : -1;
-            EnhancedAttack4Part1Random  = dir * Main.rand.Next(3, 6) * 16;
 
-            if (EnhancedAttack4LoopCount >= 3)
-            {
-                EnhancedAttack4LoopCount  = 0f;
-                EnhancedAttack4HoverTimer = 0f;
-                EnhancedAttack4Angle      = 0f;
-                AITimer                   = 0f; 
-                EnhancedAttack4CloneSequence   = 0;
-                EnhancedAttack4CloneTimer      = 0f;
-                EnhancedAttack4CloneCount = 0;
+            AttackTimer   = 0f;
+            AttackTimer = 0f;
+            AITimer                   = 0f; 
+            EnhancedAttack4CloneSequence   = 0;
+            CloneTimer      = 0f;
 
 
-                AIState    = (float)ActionState.Reset;
+            AIState    = (float)ActionState.Reset;
 
-                NPC.netUpdate = true;
+            NPC.netUpdate = true;
             }
         }
     }
 
 
 
+    
 
-}
 
 #region Networking
 public override void SendExtraAI(System.IO.BinaryWriter writer)
@@ -1278,9 +1247,10 @@ public override void SendExtraAI(System.IO.BinaryWriter writer)
     writer.Write(Attack4Angle);
     writer.Write(Attack4Part1Random);  // random direction * random int
 
-    writer.Write(EnhancedAttack4Angle);
-    writer.Write(EnhancedAttack4Part1Random);
 
+    writer.Write(EnhancedAttack3SubAttack);
+
+    writer.Write(EnhancedAttack4CloneSequence);
     // LaunchDirection is calculated from NPC.Center → player.Center
     // but it's only set once and then held, so sync it
     writer.Write(LaunchDirection.X);
@@ -1295,8 +1265,10 @@ public override void ReceiveExtraAI(System.IO.BinaryReader reader)
     Attack4Angle = reader.ReadSingle();
     Attack4Part1Random = reader.ReadInt32();
 
-    EnhancedAttack4Angle = reader.ReadSingle();
-    EnhancedAttack4Part1Random = reader.ReadInt32();
+
+    EnhancedAttack3SubAttack = reader.ReadSingle();
+
+    EnhancedAttack4CloneSequence = reader.ReadInt32();
 
     LaunchDirection = new Vector2(reader.ReadSingle(), reader.ReadSingle());
 }
