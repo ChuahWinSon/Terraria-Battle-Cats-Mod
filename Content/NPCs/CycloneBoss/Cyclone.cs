@@ -212,6 +212,13 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         private void DoBehavior_ResetAI()
         {
+
+            // reset all shared state here so individual attacks don't have to remember
+            OrbitAngle = 0f;
+            LaunchDirection = Vector2.Zero;
+            LaunchTimer = 0f;
+
+            
             NPC.TargetClosest(false);
             NPC.velocity *= 0.95f;
 
@@ -854,8 +861,6 @@ private void SpawnRainVolley(Player player)
 }
 
 
-private float EnhancedAttack2OrbitAngle = 0f;
-private int   EnhancedAttack2ShootTimer = 0;
 private float EnhancedOrbitRadius2      = 400f;
 private const float EnhancedOrbitSpeed2 = 0.02f;
 
@@ -873,15 +878,19 @@ private void EnhancedAttack2()
 
     if (AITimer == 61f)
     {
-        EnhancedAttack2OrbitAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-        NPC.Center                = player.Center + new Vector2(EnhancedOrbitRadius2, 0f).RotatedBy(EnhancedAttack2OrbitAngle);
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            OrbitAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+            NPC.netUpdate = true; // This triggers SendExtraAI
+        }
+        NPC.Center                = player.Center + new Vector2(EnhancedOrbitRadius2, 0f).RotatedBy(OrbitAngle);
         NPC.alpha                 = 255;
         NPC.velocity              = Vector2.Zero;
         NPC.netUpdate             = true;
 
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
-            float clone1Angle = EnhancedAttack2OrbitAngle + MathHelper.Pi;
+            float clone1Angle = OrbitAngle + MathHelper.Pi;
             Vector2 clone1Pos = player.Center + new Vector2(EnhancedOrbitRadius2, 0f).RotatedBy(clone1Angle);
 
             int clone1Index = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clone1Pos.X, (int)clone1Pos.Y, ModContent.NPCType<CycloneClone>());
@@ -896,19 +905,19 @@ private void EnhancedAttack2()
     {
         NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
 
-        EnhancedAttack2OrbitAngle += EnhancedOrbitSpeed2;
+        OrbitAngle += EnhancedOrbitSpeed2;
 
-        Vector2 targetPos     = player.Center + new Vector2(EnhancedOrbitRadius2, 0f).RotatedBy(EnhancedAttack2OrbitAngle);
+        Vector2 targetPos     = player.Center + new Vector2(EnhancedOrbitRadius2, 0f).RotatedBy(OrbitAngle);
         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
         NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
 
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
 
-        EnhancedAttack2ShootTimer++;
-        if (EnhancedAttack2ShootTimer >= 50)
+        AttackTimer++;
+        if (AttackTimer >= 50)
         {
-            EnhancedAttack2ShootTimer = 0;
+            AttackTimer = 0;
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
@@ -932,6 +941,7 @@ private void EnhancedAttack2()
                     2f,
                     Main.myPlayer
                 );
+                
                 SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
         }
@@ -944,12 +954,13 @@ private void EnhancedAttack2()
     {
         NPC.alpha                 = 0;
         AITimer                   = 0f;
-        EnhancedAttack2OrbitAngle = 0f;
-        EnhancedAttack2ShootTimer = 0;
+        OrbitAngle = 0f;
+        AttackTimer = 0;
 
 
         AIState    = (float)ActionState.Reset;
 
+        NPC.netUpdate = true;
     }
 }
 
@@ -1267,7 +1278,6 @@ public override void SendExtraAI(System.IO.BinaryWriter writer)
     writer.Write(Attack4Angle);
     writer.Write(Attack4Part1Random);  // random direction * random int
 
-    writer.Write(EnhancedAttack2OrbitAngle);
     writer.Write(EnhancedAttack4Angle);
     writer.Write(EnhancedAttack4Part1Random);
 
@@ -1285,7 +1295,6 @@ public override void ReceiveExtraAI(System.IO.BinaryReader reader)
     Attack4Angle = reader.ReadSingle();
     Attack4Part1Random = reader.ReadInt32();
 
-    EnhancedAttack2OrbitAngle = reader.ReadSingle();
     EnhancedAttack4Angle = reader.ReadSingle();
     EnhancedAttack4Part1Random = reader.ReadInt32();
 
