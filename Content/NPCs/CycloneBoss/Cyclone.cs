@@ -34,7 +34,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public ref float AIState => ref NPC.ai[0];
         public ref float AITimer => ref NPC.ai[1];
-
+        public ref float AttackTimer => ref NPC.ai[2];
+        public ref float CloneTimer => ref NPC.ai[3];
         private ActionState PreviousState = ActionState.Idle;
 
         
@@ -67,15 +68,17 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
         };
 
+        private static readonly SoundStyle CycloneRoarGor = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarGor")
+        {
+            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+        };
+
         private static readonly SoundStyle CycloneRoarDrag = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarDrag")
         {
             PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
         };
 
-        private static readonly SoundStyle CycloneRoarGor = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarGor")
-        {
-            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
-        };
+        
         public override void SetStaticDefaults()
         {
             Main.npcFrameCount[NPC.type] = 29;
@@ -732,20 +735,16 @@ private void SpawnLaserProjectiles(Player player)
 
 
 
-private float EnhancedAttack1HoverTimer = 0f;
-private int   EnhancedAttack1ShootTimer = 0;
-private const int   EnhancedAttack1Loops    = 20;   // how many volleys before ending
-private float EnhancedAttack1LoopCount  = 0f;
-private float EnhancedAttack1BobTimer   = 0f;      // for the subtle bobbing
-private float EnhancedAttack1CloneTimer = 0f;
 
-private int EnhancedAttack1CloneCount = 0;
+
+
 private void EnhancedAttack1()
-{
+{   
     Player player = Main.player[NPC.target];
     AITimer++;
-    EnhancedAttack1CloneTimer++;
-
+    // Let clone timer run first so its staggered forward
+    CloneTimer++;
+    
     // Phase 1: disappear
     if (AITimer < 60f)
     {
@@ -761,14 +760,14 @@ private void EnhancedAttack1()
         NPC.alpha     = 255;
         NPC.velocity  = Vector2.Zero;
         NPC.netUpdate = true;
+        SoundEngine.PlaySound(CycloneRoarGor, NPC.Center);
 
     }
 
     
 
-    if (EnhancedAttack1CloneTimer >= 241f && EnhancedAttack1CloneCount < 2)
+    if (CloneTimer % 241f == 1 && CloneTimer < 500) //spawns only 2 clones
         {
-            EnhancedAttack1CloneTimer  = 0f;
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
@@ -776,9 +775,8 @@ private void EnhancedAttack1()
                 int cloneIndex   = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePos.X, (int)clonePos.Y, ModContent.NPCType<CycloneClone>());
                 Main.npc[cloneIndex].ai[1] = 1f;
                 Main.npc[cloneIndex].netUpdate = true;
-                SoundEngine.PlaySound(ProjectileSound, NPC.Center);
+                SoundEngine.PlaySound(CycloneRoarGor, NPC.Center);
             }
-            EnhancedAttack1CloneCount ++;
         }
     // Phase 3: hover and rain projectiles
     if (AITimer >= 61f)
@@ -787,38 +785,34 @@ private void EnhancedAttack1()
         NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
 
         // Subtle bobbing — stays in place but moves slightly up and down
-        EnhancedAttack1BobTimer += 0.03f;
-        float bobOffset = (float)Math.Sin(EnhancedAttack1BobTimer) * 4f;
+        float bobOffset = (float)Math.Sin(Main.GlobalTimeWrappedHourly * 2f) * 4f;
         NPC.velocity = new Vector2(0f, bobOffset * 0.1f);
 
         // Face player
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
 
-        EnhancedAttack1ShootTimer++;
-        if (EnhancedAttack1ShootTimer >= 40) // every 40 ticks fire a volley
+        AttackTimer++;
+        if (AttackTimer % 40 == 0) // every 40 ticks fire a volley
         {
-            EnhancedAttack1ShootTimer = 0;
-            EnhancedAttack1LoopCount++;
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
                 SpawnRainVolley(player);
 
-            if (EnhancedAttack1LoopCount >= EnhancedAttack1Loops)
-            {
-                EnhancedAttack1LoopCount  = 0f;
-                EnhancedAttack1ShootTimer = 0;
-                EnhancedAttack1BobTimer   = 0f;
-                NPC.alpha                 = 0;
-                AITimer                   = 0f;
-                EnhancedAttack1CloneCount = 0;
-                EnhancedAttack1CloneTimer = 0;
+            
+        }
+
+        if (AttackTimer >= 800)
+        {
+            AttackTimer = 0;
+            NPC.alpha                 = 0;
+            AITimer                   = 0f;
+            CloneTimer = 0;
 
 
-                AIState    = (float)ActionState.Reset;
-                
-                NPC.netUpdate = true;
-            }
+            AIState    = (float)ActionState.Reset;
+            
+            NPC.netUpdate = true;
         }
     }
 }
