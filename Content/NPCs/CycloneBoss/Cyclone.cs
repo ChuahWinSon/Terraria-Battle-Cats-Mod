@@ -21,11 +21,11 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private enum ActionState
         {
             Idle,
+            Reset,
             Attack1,
             Attack2,
             Attack3,
             Attack4,
-            Transform,
             EnhancedAttack1,
             EnhancedAttack2,
             EnhancedAttack3,
@@ -59,6 +59,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public bool IsPhase2 => NPC.life <= NPC.lifeMax / 2;
         private const int CloneOffset = 100; // pixels left/right, tune this
         private const int CloneAlpha  = 200; // transparency, tune this
+
+
 
         private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
         {
@@ -123,8 +125,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         // }
 
 
-        private bool HasTransitioned = false;
-        private bool PendingTransform = false;
+
+        private float LifeRatio;
 
         public override void AI()
         {
@@ -139,6 +141,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 return;
             }
 
+            LifeRatio = (float)NPC.life / NPC.lifeMax;
+
             ActionState CurrentState = (ActionState)AIState;
 
             if (CurrentState != PreviousState)
@@ -151,6 +155,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Idle:
                     Idle();
                     break;
+                case (float)ActionState.Reset:
+                    DoBehavior_ResetAI();
+                    break;
                 case (float)ActionState.Attack1:
                     Attack1();
                     break;
@@ -162,9 +169,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                     break;
                 case (float)ActionState.Attack4:
                     Attack4();
-                    break;
-                case (float)ActionState.Transform:
-                    Transform();
                     break;
                 case (float)ActionState.EnhancedAttack1:
                     EnhancedAttack1();
@@ -182,10 +186,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
             }
 
-            if (IsPhase2 && !HasTransitioned && !PendingTransform)
-            {
-                PendingTransform = true;
-            }
 
 
         }
@@ -201,6 +201,47 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 AITimer = 0f;
                 AIState = (float)ActionState.Attack3;
             }
+        }
+
+        private ActionState previousAttack = ActionState.Idle;
+
+        
+
+        private void DoBehavior_ResetAI()
+        {
+            NPC.TargetClosest(false);
+            NPC.velocity *= 0.95f;
+
+            ActionState nextAttack;
+            do
+            {
+                if (LifeRatio > 0.62f)
+                {
+                    nextAttack = Main.rand.Next(4) switch
+                    {
+                        0 => ActionState.Attack1,
+                        1 => ActionState.Attack2,
+                        2 => ActionState.Attack3,
+                        _ => ActionState.Attack4,
+                    };
+                }
+                else
+                {
+                    nextAttack = Main.rand.Next(4) switch
+                    {
+                        0 => ActionState.EnhancedAttack1,
+                        1 => ActionState.EnhancedAttack2,
+                        2 => ActionState.EnhancedAttack3,
+                        _ => ActionState.EnhancedAttack4,
+                    };
+                }
+            }
+            while (nextAttack == previousAttack); // never repeat the same attack twice
+
+            previousAttack = nextAttack;
+            AIState = (float)nextAttack;
+            AITimer = 0f;
+            NPC.netUpdate = true;
         }
 
         // orbit state variables
@@ -265,17 +306,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 AITimer = 0f;
                 OrbitAngle = 0f;
                 LaunchDirection = Vector2.Zero;
-                if (PendingTransform)
-                {
-                    AIState          = (float)ActionState.Transform;
-                    PendingTransform = false;
-                    HasTransitioned  = true;
-                }
-                else
-                {
-                AIState = (float)ActionState.Attack2;
-                }
-                NPC.netUpdate = true;
+                AIState = (float)ActionState.Reset;
+
             }
         }
 
@@ -372,17 +404,8 @@ private void Attack2()
         AITimer           = 0f;
         Attack2OrbitAngle = 0f;
         Attack2ShootTimer = 0;
-        if (PendingTransform)
-        {
-            AIState          = (float)ActionState.Transform;
-            PendingTransform = false;
-            HasTransitioned  = true;
-        }
-        else
-        {
-        AIState = (float)ActionState.Attack3;
-        }
-        NPC.netUpdate = true;
+        AIState = (float)ActionState.Reset;
+
     }
 }
 
@@ -456,17 +479,8 @@ private void Attack3()
     {
         NPC.alpha  = 0;
         AITimer    = 0f;
-        if (PendingTransform)
-        {
-            AIState          = (float)ActionState.Transform;
-            PendingTransform = false;
-            HasTransitioned  = true;
-        }
-        else
-        {
-        AIState = (float)ActionState.Attack4;
-        }
-        NPC.netUpdate = true;
+        AIState = (float)ActionState.Reset;
+
     }
 }
 
@@ -653,17 +667,8 @@ private void Attack4()
                 Attack4HoverTimer = 0f;
                 Attack4Angle      = 0f;
                 AITimer           = 0f;
-                if (PendingTransform)
-                {
-                    AIState          = (float)ActionState.Transform;
-                    PendingTransform = false;
-                    HasTransitioned  = true;
-                }
-                else
-                {
-                AIState = (float)ActionState.Attack1;
-                }
-                NPC.netUpdate = true;
+                AIState = (float)ActionState.Reset;
+
             }
         }
     }
@@ -725,26 +730,6 @@ private void SpawnLaserProjectiles(Player player)
     }
 }
 
-    private void Transform()
-    {
-        AITimer++;
-        NPC.velocity *= 0.95f;
-
-        if (AITimer < 60f)
-        {
-            NPC.velocity = Vector2.Zero;
-            NPC.alpha    = (int)MathHelper.Lerp(0, 255, AITimer / 60f);
-            return;
-            
-        }
-
-        if (AITimer >= 120f)
-        {
-            AITimer = 0f;
-            AIState = (float)ActionState.EnhancedAttack1;
-        }
-        
-    }
 
 
 private float EnhancedAttack1HoverTimer = 0f;
@@ -830,7 +815,7 @@ private void EnhancedAttack1()
                 EnhancedAttack1CloneTimer = 0;
 
 
-                AIState    = (float)ActionState.EnhancedAttack2;
+                AIState    = (float)ActionState.Reset;
                 
                 NPC.netUpdate = true;
             }
@@ -969,7 +954,7 @@ private void EnhancedAttack2()
         EnhancedAttack2ShootTimer = 0;
 
 
-        AIState    = (float)ActionState.EnhancedAttack3;
+        AIState    = (float)ActionState.Reset;
 
     }
 }
@@ -1046,7 +1031,7 @@ private void EnhancedAttack3()
         NPC.alpha  = 0;
         AITimer    = 0f;
         EnhancedAttack3ShootTimer   = 0;
-        AIState    = (float)ActionState.EnhancedAttack4;
+        AIState    = (float)ActionState.Reset;
 
         NPC.netUpdate = true;
     }
@@ -1266,7 +1251,7 @@ private void EnhancedAttack4()
                 EnhancedAttack4CloneCount = 0;
 
 
-                AIState    = (float)ActionState.EnhancedAttack1;
+                AIState    = (float)ActionState.Reset;
 
                 NPC.netUpdate = true;
             }
@@ -1281,8 +1266,6 @@ private void EnhancedAttack4()
 #region Networking
 public override void SendExtraAI(System.IO.BinaryWriter writer)
 {
-    writer.Write(HasTransitioned);
-    writer.Write(PendingTransform);
 
     // Random picks clients can't reproduce
     writer.Write(OrbitAngle);          // Main.rand.NextFloat on server
@@ -1302,8 +1285,6 @@ public override void SendExtraAI(System.IO.BinaryWriter writer)
 
 public override void ReceiveExtraAI(System.IO.BinaryReader reader)
 {
-    HasTransitioned = reader.ReadBoolean();
-    PendingTransform = reader.ReadBoolean();
 
     OrbitAngle = reader.ReadSingle();
     Attack2OrbitAngle = reader.ReadSingle();
