@@ -10,6 +10,7 @@ using Terraria.Audio;
 using Terraria.GameContent;
 using ReLogic.Content;
 using Terraria.GameContent.LootSimulation.LootSimulatorConditionSetterTypes;
+using TheBattleCats.Common.Graphics.Particles;
 
 namespace TheBattleCats.Content.NPCs.CycloneBoss
 {
@@ -37,7 +38,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float AITimer => ref NPC.ai[1];
         public ref float AttackTimer => ref NPC.ai[2];
         public ref float CloneTimer => ref NPC.ai[3];
-        private ActionState PreviousState = ActionState.Idle;
+        private ActionState PreviousState = ActionState.Reset;
 
         
 
@@ -156,11 +157,11 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
             switch (AIState)
             {
-                case (float)ActionState.Idle:
-                    Idle();
-                    break;
                 case (float)ActionState.Reset:
                     DoBehavior_ResetAI();
+                    break;
+                case (float)ActionState.Idle:
+                    Idle();
                     break;
                 case (float)ActionState.Attack1:
                     Attack1();
@@ -224,31 +225,33 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             NPC.velocity *= 0.95f;
 
             ActionState nextAttack;
-            do
-            {
-                if (LifeRatio > 0.62f)
-                {
-                    nextAttack = Main.rand.Next(4) switch
-                    {
-                        0 => ActionState.Attack1,
-                        1 => ActionState.Attack2,
-                        2 => ActionState.Attack3,
-                        _ => ActionState.Attack4,
-                    };
-                }
-                else
-                {
-                    nextAttack = Main.rand.Next(4) switch
-                    {
-                        0 => ActionState.EnhancedAttack1,
-                        1 => ActionState.EnhancedAttack2,
-                        2 => ActionState.EnhancedAttack3,
-                        _ => ActionState.EnhancedAttack4,
-                    };
-                }
-            }
-            while (nextAttack == previousAttack); // never repeat the same attack twice
+            // do
+            // {
+            //     if (LifeRatio > 0.62f)
+            //     {
+            //         nextAttack = Main.rand.Next(4) switch
+            //         {
+            //             0 => ActionState.Attack1,
+            //             1 => ActionState.Attack2,
+            //             2 => ActionState.Attack3,
+            //             _ => ActionState.Attack4,
+            //         };
+            //     }
+            //     else
+            //     {
+            //         nextAttack = Main.rand.Next(4) switch
+            //         {
+            //             0 => ActionState.EnhancedAttack1,
+            //             1 => ActionState.EnhancedAttack2,
+            //             2 => ActionState.EnhancedAttack3,
+            //             _ => ActionState.EnhancedAttack4,
+            //         };  
+            //     }
+            // }
 
+            // while (nextAttack == previousAttack); // never repeat the same attack twice
+
+            nextAttack = ActionState.EnhancedAttack1;
             previousAttack = nextAttack;
             AIState = (float)nextAttack;
             AITimer = 0f;
@@ -750,8 +753,10 @@ private void EnhancedAttack1()
 {   
     Player player = Main.player[NPC.target];
     AITimer++;
-    // Let clone timer run first so its staggered forward
-    CloneTimer++;
+
+    ref float clonePosX = ref NPC.localAI[0];
+    ref float clonePosY = ref NPC.localAI[1];
+    
     
     // Phase 1: disappear
     if (AITimer < 60f)
@@ -772,20 +777,29 @@ private void EnhancedAttack1()
 
     }
 
+    CloneTimer++;
     
-
-    if (CloneTimer % 241f == 1 && CloneTimer < 500) //spawns only 2 clones total
+    if (CloneTimer < 700)
+    {
+        if (CloneTimer % 121 == 61 && Main.netMode != NetmodeID.MultiplayerClient)
         {
-            if (Main.netMode != NetmodeID.MultiplayerClient)
-            {
-                float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-                Vector2 clonePos = player.Center + new Vector2(300f, 0f).RotatedBy(cloneAngle);
-                int cloneIndex   = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePos.X, (int)clonePos.Y, ModContent.NPCType<CycloneClone>());
-                Main.npc[cloneIndex].ai[1] = 1f;
-                Main.npc[cloneIndex].netUpdate = true;
-                SoundEngine.PlaySound(CycloneRoarGor, NPC.Center);
-            }
+            float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+            Vector2 clonePos = player.Center + new Vector2(300f, 0f).RotatedBy(cloneAngle);
+            clonePosX = clonePos.X;
+            clonePosY = clonePos.Y;
+            CreateTeleportTelegraph(clonePos);
+            NPC.netUpdate = true;
         }
+
+        if (CloneTimer % 121 == 1 && CloneTimer > 2 && Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            int cloneIndex = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePosX, (int)clonePosY, ModContent.NPCType<CycloneClone>());
+            Main.npc[cloneIndex].ai[1] = 1f;
+            Main.npc[cloneIndex].netUpdate = true;
+            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+        }
+    }
+    
     // Phase 3: hover and rain projectiles
     if (AITimer >= 61f)
     {
@@ -823,6 +837,18 @@ private void EnhancedAttack1()
             NPC.netUpdate = true;
         }
     }
+}
+
+public static void CreateTeleportTelegraph(Vector2 teleportPosition, float cloudOpacity = 1f)
+{
+    Color fireColor = Main.rand.NextBool() ? Color.Purple : Color.Lime;
+    CloudParticle noxiousCloud = new(teleportPosition, Main.rand.NextVector2Circular(6f, 6f), fireColor * cloudOpacity, Color.DarkGray, 120, Main.rand.NextFloat(2f, 2.4f));
+    ParticleHandler.SpawnParticle(noxiousCloud);
+
+    Dust fire = Dust.NewDustPerfect(teleportPosition + Main.rand.NextVector2Square(-50f, 50f), DustID.CursedTorch);
+    fire.velocity = -Vector2.UnitY.RotateRandom(0.5f) * Main.rand.NextFloat(1f, 5f);
+    fire.scale *= 1.66f;
+    fire.noGravity = true;
 }
 
 private void SpawnRainVolley(Player player)
@@ -1368,71 +1394,121 @@ public class CycloneClone : ModNPC
             case 3: DoAttack3();   break;
             case 4: DoAttack4(); break;
         }
+        
 
     }
     
-private float CloneOrbitAngle     = 0f;
-private float CloneOrbitRadius    = 300f;
-private Vector2 CloneLaunchDirection = Vector2.Zero;
-private const float CloneOrbitSpeed = 0.03f;
-private const float CloneOrbitLaunchDegrees = 270f;
+// private float CloneOrbitAngle     = 0f;
+// private float CloneOrbitRadius    = 300f;
+// private Vector2 CloneLaunchDirection = Vector2.Zero;
+// private const float CloneOrbitSpeed = 0.03f;
+// private const float CloneOrbitLaunchDegrees = 270f;
 
-private const float OrbitRadians = 270f * (MathHelper.Pi / 180f); //270 degrees i think
-private const float OrbitDuration = OrbitRadians / CloneOrbitSpeed;
-private bool CloneLaunched = false;
+// private const float OrbitRadians = 270f * (MathHelper.Pi / 180f); //270 degrees i think
+// private const float OrbitDuration = OrbitRadians / CloneOrbitSpeed;
+// private bool CloneLaunched = false;
+// private void DoAttack1()
+// {
+//     Player player = Main.player[NPC.target];
+//     AITimer++;
+
+//     // Phase 2: teleport to random position around player
+//     if (AITimer == 1f)
+//     {
+//         NPC.Center        = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
+//         NPC.alpha         = 160;
+//         NPC.netUpdate     = true;
+//     }
+
+//     // Phase 3: orbit
+//     if (AITimer >= 1f && AITimer < OrbitDuration)
+//     {   
+//         NPC.alpha = (int)MathHelper.Lerp(255, 200, (AITimer - 1f) / 60f);
+//         CloneOrbitAngle = AITimer * CloneOrbitSpeed;
+
+//         Vector2 targetPos     = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
+//         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+//         NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.15f);
+
+//         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+//         NPC.spriteDirection = NPC.direction;
+//         return;
+//     }
+
+//     // Phase 4: launch at player
+//     if (CloneLaunchDirection == Vector2.Zero && CloneLaunched == false)
+//     {
+//         CloneLaunchDirection = Vector2.Normalize(player.Center - NPC.Center);
+//         CloneLaunched = true;
+
+//     }
+//     NPC.velocity = CloneLaunchDirection * 14f;
+
+//     ExtraIncrement++;
+//     if (ExtraIncrement >= 60)
+//     {
+//         NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((ExtraIncrement - 60f) / 60f, 1f));
+//         CloneLaunchDirection = Vector2.Zero;
+        
+//     }
+
+//     if (ExtraIncrement >= 120)
+//     {
+//         ExtraIncrement     = 0;
+//         CloneOrbitAngle      = 0f;
+//         NPC.active           = false;
+//         CloneLaunched = false;
+//     }
+// }
+
+
+private Vector2 DashDirection = Vector2.Zero;
+private bool DashLaunched = false;
+private float CloneOrbitRadius    = 300f;
 private void DoAttack1()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
 
-    // Phase 2: teleport to random position around player
-    if (AITimer == 1f)
+
+    // Frames 1–30: wait, fade in
+    if (AITimer <= 30f)
     {
-        NPC.Center        = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
-        NPC.alpha         = 160;
-        NPC.netUpdate     = true;
-    }
-
-    // Phase 3: orbit
-    if (AITimer >= 1f && AITimer < OrbitDuration)
-    {   
-        NPC.alpha = (int)MathHelper.Lerp(255, 200, (AITimer - 1f) / 60f);
-        CloneOrbitAngle = AITimer * CloneOrbitSpeed;
-
-        Vector2 targetPos     = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
-        Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
-        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.15f);
-
+        NPC.alpha = (int)MathHelper.Lerp(255, 200, (AITimer - 1f) / 30f);
+        NPC.velocity = Vector2.Zero;
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
         return;
-    }
-
-    // Phase 4: launch at player
-    if (CloneLaunchDirection == Vector2.Zero && CloneLaunched == false)
-    {
-        CloneLaunchDirection = Vector2.Normalize(player.Center - NPC.Center);
-        CloneLaunched = true;
-
-    }
-    NPC.velocity = CloneLaunchDirection * 14f;
-
-    ExtraIncrement++;
-    if (ExtraIncrement >= 60)
-    {
-        NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((ExtraIncrement - 60f) / 60f, 1f));
-        CloneLaunchDirection = Vector2.Zero;
         
     }
 
-    if (ExtraIncrement >= 120)
+    // Frame 61: lock in dash direction
+    if (!DashLaunched)
     {
-        ExtraIncrement     = 0;
-        CloneOrbitAngle      = 0f;
-        NPC.active           = false;
-        CloneLaunched = false;
+        DashDirection = Vector2.Normalize(player.Center - NPC.Center);
+        DashLaunched  = true;
+    }
+
+    // Dash
+    NPC.velocity = DashDirection * 14f;
+    ExtraIncrement++;
+
+    // Only start fading after 60 frames of dashing
+    if (ExtraIncrement >= 60)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((ExtraIncrement - 60f) / 30f, 1f));
+    }
+
+    // Kill after 90 frames total (60 dash + 60 fade)
+    if (ExtraIncrement >= 90)
+    {
+        ExtraIncrement = 0;
+        DashLaunched   = false;
+        DashDirection  = Vector2.Zero;
+        NPC.active     = false;
     }
 }
+
 
 private void DoAttack2()
 {
