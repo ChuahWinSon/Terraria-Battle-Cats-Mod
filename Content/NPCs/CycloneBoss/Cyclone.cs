@@ -22,6 +22,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Idle,
             Reset,
+            
             Attack1,
             Attack2,
             Attack3,
@@ -763,7 +764,7 @@ private void EnhancedAttack1()
     // Phase 2: teleport above player
     if (AITimer == 61f)
     {
-        NPC.Center = player.Center + new Vector2(Main.rand.NextFloat(-300f, 300f), -240f);
+        NPC.Center = player.Center + new Vector2(300f, -240f);
         NPC.alpha     = 255;
         NPC.velocity  = Vector2.Zero;
         NPC.netUpdate = true;
@@ -773,7 +774,7 @@ private void EnhancedAttack1()
 
     
 
-    if (CloneTimer % 241f == 1 && CloneTimer < 500) //spawns only 2 clones
+    if (CloneTimer % 241f == 1 && CloneTimer < 500) //spawns only 2 clones total
         {
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
@@ -1302,6 +1303,9 @@ public override void ReceiveExtraAI(System.IO.BinaryReader reader)
 public class CycloneClone : ModNPC
 {
     public ref float AITimer => ref NPC.ai[0];
+    //npc.ai[1] is the attack we pass through
+    //npc.ai[2] is being used to pass info from boss
+    public ref float ExtraIncrement => ref NPC.ai[3];
     private Vector2 LaunchTarget = Vector2.Zero;
     
     private const int FadeInDuration = 59;
@@ -1370,10 +1374,11 @@ public class CycloneClone : ModNPC
 private float CloneOrbitAngle     = 0f;
 private float CloneOrbitRadius    = 300f;
 private Vector2 CloneLaunchDirection = Vector2.Zero;
-private float CloneLaunchTimer    = 0f;
 private const float CloneOrbitSpeed = 0.03f;
 private const float CloneOrbitLaunchDegrees = 270f;
 
+private const float OrbitRadians = 270f * (MathHelper.Pi / 180f); //270 degrees i think
+private const float OrbitDuration = OrbitRadians / CloneOrbitSpeed;
 private bool CloneLaunched = false;
 private void DoAttack1()
 {
@@ -1383,17 +1388,16 @@ private void DoAttack1()
     // Phase 2: teleport to random position around player
     if (AITimer == 1f)
     {
-        CloneOrbitAngle   = Main.rand.NextFloat(0, MathHelper.TwoPi);
         NPC.Center        = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
         NPC.alpha         = 160;
         NPC.netUpdate     = true;
     }
 
     // Phase 3: orbit
-    if (AITimer >= 1f && AITimer < (CloneOrbitLaunchDegrees / MathHelper.ToDegrees(CloneOrbitSpeed)))
+    if (AITimer >= 1f && AITimer < OrbitDuration)
     {   
         NPC.alpha = (int)MathHelper.Lerp(255, 200, (AITimer - 1f) / 60f);
-        CloneOrbitAngle += CloneOrbitSpeed;
+        CloneOrbitAngle = AITimer * CloneOrbitSpeed;
 
         Vector2 targetPos     = player.Center + new Vector2(CloneOrbitRadius, 0f).RotatedBy(CloneOrbitAngle);
         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
@@ -1413,17 +1417,17 @@ private void DoAttack1()
     }
     NPC.velocity = CloneLaunchDirection * 14f;
 
-    CloneLaunchTimer++;
-    if (CloneLaunchTimer >= 60)
+    ExtraIncrement++;
+    if (ExtraIncrement >= 60)
     {
-        NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((CloneLaunchTimer - 60f) / 60f, 1f));
+        NPC.alpha = (int)MathHelper.Lerp(200, 255, Math.Min((ExtraIncrement - 60f) / 60f, 1f));
         CloneLaunchDirection = Vector2.Zero;
         
     }
 
-    if (CloneLaunchTimer >= 120)
+    if (ExtraIncrement >= 120)
     {
-        CloneLaunchTimer     = 0;
+        ExtraIncrement     = 0;
         CloneOrbitAngle      = 0f;
         NPC.active           = false;
         CloneLaunched = false;
