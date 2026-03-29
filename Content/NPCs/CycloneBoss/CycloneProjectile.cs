@@ -54,110 +54,113 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         }
     }
 
-    public class CycloneProjectile1 : ModProjectile
-    {
-        public override void SetDefaults()
-        {
-            Projectile.width       = 16;
-            Projectile.height      = 16;
-            Projectile.hostile     = true;
-            Projectile.friendly    = false;
-            Projectile.tileCollide = false;
-            Projectile.timeLeft    = 300;
-            Projectile.aiStyle     = -1;
-        }
+    // public class CycloneProjectile1 : ModProjectile
+    // {
+    //     public override void SetDefaults()
+    //     {
+    //         Projectile.width       = 16;
+    //         Projectile.height      = 16;
+    //         Projectile.hostile     = true;
+    //         Projectile.friendly    = false;
+    //         Projectile.tileCollide = false;
+    //         Projectile.timeLeft    = 300;
+    //         Projectile.aiStyle     = -1;
+    //     }
 
-        public override void AI()
-        {
+    //     public override void AI()
+    //     {
 
-            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+    //         Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
             
 
-        // float speed = Projectile.velocity.Length();
-        //     // Converging spread logic
-        // if (Projectile.ai[0] == 1f)
-        // {
-        //     float currentOffset = Projectile.ai[1];
+    //     float speed = Projectile.velocity.Length();
+    //         // Converging spread logic
+    //     if (Projectile.ai[0] == 1f)
+    //     {
+    //         float currentOffset = Projectile.ai[1];
 
-        //     // Lerp offset toward 0 over 30 ticks (0.5 seconds)
-        //     Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
+    //         // Lerp offset toward 0 over 30 ticks (0.5 seconds)
+    //         Projectile.ai[1] = MathHelper.Lerp(currentOffset, 0f, 0.07f);
 
-        //     // Recalculate velocity direction based on current offset
-        //     float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
-        //     Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
-        // }
+    //         // Recalculate velocity direction based on current offset
+    //         float baseAngle = (float)Math.Atan2(Projectile.velocity.Y, Projectile.velocity.X) - currentOffset + Projectile.ai[1];
+    //         Projectile.velocity = new Vector2((float)Math.Cos(baseAngle), (float)Math.Sin(baseAngle)) * speed;
+    //     }
 
-        //     Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+    //         Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
-        // if (speed < 10f) // max speed cap
-        // {
-        //     Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
-        // }
-        }
+    //     if (speed < 10f) // max speed cap
+    //     {
+    //         Projectile.velocity += Vector2.Normalize(Projectile.velocity) * 0.1f;
+    //     }
+    //     }
+    // }
+
+
+   public class CycloneProjectile : ModProjectile
+{
+    // Store which variant (0-3) in ai[0]
+    private int Variant => (int)Projectile.ai[0];
+
+    // Texture paths for each variant
+    private static readonly string[] TexturePaths = new string[]
+    {
+        "TheBattleCats/Content/NPCs/CycloneBoss/CycloneProjectile",
+        "TheBattleCats/Content/NPCs/CycloneBoss/CycloneProjectile2",
+        "TheBattleCats/Content/NPCs/CycloneBoss/CycloneProjectile3",
+        "TheBattleCats/Content/NPCs/CycloneBoss/CycloneProjectile4",
+    };
+
+    public override void SetStaticDefaults()
+    {
+        Main.projFrames[Type] = 1;
+        ProjectileID.Sets.TrailingMode[Projectile.type] = 0;
+        ProjectileID.Sets.TrailCacheLength[Projectile.type] = 7;
     }
 
-    public class CycloneProjectile2 : ModProjectile
+    public override void SetDefaults()
     {
-        public override void SetDefaults()
-        {
-            Projectile.width       = 16;
-            Projectile.height      = 16;
-            Projectile.hostile     = true;
-            Projectile.friendly    = false;
-            Projectile.tileCollide = false;
-            Projectile.timeLeft    = 300;
-            Projectile.aiStyle     = -1;
-        }
+        Projectile.width       = 16;
+        Projectile.height      = 16;
+        Projectile.hostile     = true;
+        Projectile.friendly    = false;
+        Projectile.tileCollide = false;
+        Projectile.timeLeft    = 300;
+        Projectile.aiStyle     = -1;
+    }
 
-        public override void AI()
-        {
-        
+    public override void AI()
+    {
         Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
+        if (Main.rand.NextBool(5))
+        {
+            Dust d = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Stone);
+            d.velocity = Main.rand.NextVector2Circular(2f, 2f);
+            d.scale = Main.rand.NextFloat(0.8f, 1.4f);
+            d.noGravity = false;
         }
     }
 
-    public class CycloneProjectile3 : ModProjectile
+    public override bool PreDraw(ref Color lightColor)
     {
-        public override void SetDefaults()
+        // Load the correct variant texture
+        Texture2D texture = ModContent.Request<Texture2D>(TexturePaths[Variant]).Value;
+
+        Color drawColor = Color.White;
+        drawColor.A = 0;
+        drawColor *= 0.5f;
+
+        for (int i = 0; i < Projectile.oldPos.Length; i++)
         {
-            Projectile.width       = 16;
-            Projectile.height      = 16;
-            Projectile.hostile     = true;
-            Projectile.friendly    = false;
-            Projectile.tileCollide = false;
-            Projectile.timeLeft    = 300;
-            Projectile.aiStyle     = -1;
+            Vector2 drawPos = Projectile.oldPos[i] - Main.screenPosition + new Vector2(Projectile.width / 2f, Projectile.height / 2f);
+            float trailOpacity = (1f - (float)i / Projectile.oldPos.Length) * 0.5f;
+            Main.EntitySpriteDraw(texture, drawPos, null, drawColor * trailOpacity, Projectile.rotation, texture.Size() / 2f, Projectile.scale, SpriteEffects.None, 0);
         }
 
-        public override void AI()
-        {
-            
-            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
-
-        }
+        return true;
     }
-
-    public class CycloneProjectile4 : ModProjectile
-    {
-        public override void SetDefaults()
-        {
-            Projectile.width       = 16;
-            Projectile.height      = 16;
-            Projectile.hostile     = true;
-            Projectile.friendly    = false;
-            Projectile.tileCollide = false;
-            Projectile.timeLeft    = 300;
-            Projectile.aiStyle     = -1;
-        }
-
-        public override void AI()
-        {
-
-            Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
-
-        }
-    }
+}
 
     public class CycloneTelegraph : ModProjectile
     {

@@ -225,33 +225,36 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             NPC.velocity *= 0.95f;
 
             ActionState nextAttack;
-            // do
-            // {
-            //     if (LifeRatio > 0.62f)
-            //     {
-            //         nextAttack = Main.rand.Next(4) switch
-            //         {
-            //             0 => ActionState.Attack1,
-            //             1 => ActionState.Attack2,
-            //             2 => ActionState.Attack3,
-            //             _ => ActionState.Attack4,
-            //         };
-            //     }
-            //     else
-            //     {
-            //         nextAttack = Main.rand.Next(4) switch
-            //         {
-            //             0 => ActionState.EnhancedAttack1,
-            //             1 => ActionState.EnhancedAttack2,
-            //             2 => ActionState.EnhancedAttack3,
-            //             _ => ActionState.EnhancedAttack4,
-            //         };  
-            //     }
-            // }
+            do
+            {
+                if (LifeRatio > 0.62f)
+                {
+                    nextAttack = Main.rand.Next(4) switch
+                    {
+                        0 => ActionState.Attack1,
+                        1 => ActionState.Attack2,
+                        2 => ActionState.Attack3,
+                        _ => ActionState.Attack4,
+                    };
+                }
+                else
+                {
+                    nextAttack = Main.rand.Next(4) switch
+                    {
+                        0 => ActionState.EnhancedAttack1,
+                        1 => ActionState.EnhancedAttack2,
+                        2 => ActionState.EnhancedAttack3,
+                        _ => ActionState.EnhancedAttack4,
+                    };  
+                }
+            }
 
-            // while (nextAttack == previousAttack); // never repeat the same attack twice
+            while (nextAttack == previousAttack); // never repeat the same attack twice
 
-            nextAttack = ActionState.EnhancedAttack1;
+
+            // nextAttack = ActionState.EnhancedAttack1; //testing
+
+
             previousAttack = nextAttack;
             AIState = (float)nextAttack;
             AITimer = 0f;
@@ -378,14 +381,6 @@ private void Attack2()
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
-                int projType = Main.rand.Next(4) switch
-                {
-                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
-                };
-
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
                 int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
@@ -393,10 +388,11 @@ private void Attack2()
                     NPC.GetSource_FromAI(),
                     NPC.Center,
                     shootDir * 10f,
-                    projType,
+                    ModContent.ProjectileType<CycloneProjectile>(),
                     damage,
                     2f,
-                    Main.myPlayer
+                    Main.myPlayer,
+                    ai0: Main.rand.Next(4)
                 );
             }
         }
@@ -533,23 +529,18 @@ private void FireWallVolley(Player player)
 
         Vector2 spawnPos = new Vector2(NPC.Center.X, spawnY);
 
-        int projType = Main.rand.Next(4) switch
-        {
-            0 => ModContent.ProjectileType<CycloneProjectile1>(),
-            1 => ModContent.ProjectileType<CycloneProjectile2>(),
-            2 => ModContent.ProjectileType<CycloneProjectile3>(),
-            _ => ModContent.ProjectileType<CycloneProjectile4>(),
-        };
+        int variant = Main.rand.Next(4);
 
         Projectile.NewProjectile(
-            NPC.GetSource_FromAI(),
-            spawnPos,
-            new Vector2(speed, 0f),
-            projType,
-            damage,
-            2f,
-            Main.myPlayer
-        );
+        NPC.GetSource_FromAI(),
+        spawnPos,
+        new Vector2(speed, 0f),
+        ModContent.ProjectileType<CycloneProjectile>(),
+        damage,
+        2f,
+        Main.myPlayer,
+        ai0: variant
+    );
     }
 }
 
@@ -642,26 +633,10 @@ private void Attack4()
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
-                int projType = Main.rand.Next(4) switch
-                {
-                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
-                };
-
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
                 int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
-
-                Projectile.NewProjectile(
-                    NPC.GetSource_FromAI(),
-                    NPC.Center,
-                    shootDir * 10f,
-                    projType,
-                    damage,
-                    2f,
-                    Main.myPlayer
-                );
+                Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4)); 
+                
             }
         }
 
@@ -725,20 +700,13 @@ private void SpawnLaserProjectiles(Player player)
 
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
-            int projType = Main.rand.Next(4) switch
-            {
-                0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                _ => ModContent.ProjectileType<CycloneProjectile4>(),
-            };
-
             Projectile.NewProjectile(
                 NPC.GetSource_FromAI(),
                 projPos,
                 new Vector2(0, projSpeed),
-                projType,
-                projDamage, 2f, Main.myPlayer
+                ModContent.ProjectileType<CycloneProjectile>(),
+                projDamage, 2f, Main.myPlayer,
+                ai0: Main.rand.Next(4)
             );
         }
     }
@@ -875,23 +843,9 @@ private void SpawnRainVolley(Player player)
 
         Vector2 spawnPos = new Vector2(spawnX, player.Center.Y - 800f); // high above
 
-        int projType = Main.rand.Next(4) switch
-        {
-            0 => ModContent.ProjectileType<CycloneProjectile1>(),
-            1 => ModContent.ProjectileType<CycloneProjectile2>(),
-            2 => ModContent.ProjectileType<CycloneProjectile3>(),
-            _ => ModContent.ProjectileType<CycloneProjectile4>(),
-        };
-
-        Projectile.NewProjectile(
-            NPC.GetSource_FromAI(),
-            spawnPos,
-            new Vector2(Main.rand.NextFloat(-1f, 1f), 8f), // slight random X drift, straight down
-            projType,
-            damage,
-            2f,
-            Main.myPlayer
-        );
+        Projectile.NewProjectile(NPC.GetSource_FromAI(), spawnPos,
+        new Vector2(Main.rand.NextFloat(-1f, 1f), 8f),
+        ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
 }
 
@@ -956,14 +910,6 @@ private void EnhancedAttack2()
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
-                int projType = Main.rand.Next(4) switch
-                {
-                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
-                };
-
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
                 int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
@@ -971,10 +917,11 @@ private void EnhancedAttack2()
                     NPC.GetSource_FromAI(),
                     NPC.Center,
                     shootDir * 10f,
-                    projType,
+                    ModContent.ProjectileType<CycloneProjectile>(),
                     damage,
                     2f,
-                    Main.myPlayer
+                    Main.myPlayer,
+                    ai0: Main.rand.Next(4)
                 );
 
                 SoundEngine.PlaySound(ProjectileSound, NPC.Center);
@@ -1114,27 +1061,8 @@ private void FireEnhancedWallVolley(Player player)
 
         Vector2 spawnPos = new Vector2(NPC.Center.X, spawnY);
 
-        int projType = Main.rand.Next(4) switch
-        {
-            0 => ModContent.ProjectileType<CycloneProjectile1>(),
-            1 => ModContent.ProjectileType<CycloneProjectile2>(),
-            2 => ModContent.ProjectileType<CycloneProjectile3>(),
-            _ => ModContent.ProjectileType<CycloneProjectile4>(),
-        };
-
-        if (Main.netMode != NetmodeID.MultiplayerClient)
-        {
-            Projectile.NewProjectile(
-                NPC.GetSource_FromAI(),
-                spawnPos,
-                new Vector2(speed, 0f),
-                projType,
-                damage,
-                2f,
-                Main.myPlayer
-            );
-            SoundEngine.PlaySound(ProjectileSound, NPC.Center);
-        }
+        Projectile.NewProjectile(NPC.GetSource_FromAI(), spawnPos, new Vector2(speed, 0f),
+        ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
 }
 
@@ -1199,14 +1127,6 @@ private void EnhancedAttack4()
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
-                int projType = Main.rand.Next(4) switch
-                {
-                    0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                    1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                    2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                    _ => ModContent.ProjectileType<CycloneProjectile4>(),
-                };
-
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
                 int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
@@ -1214,10 +1134,11 @@ private void EnhancedAttack4()
                     NPC.GetSource_FromAI(),
                     NPC.Center,
                     shootDir * 10f,
-                    projType,
+                    ModContent.ProjectileType<CycloneProjectile>(),
                     damage,
                     2f,
-                    Main.myPlayer
+                    Main.myPlayer,
+                    ai0: Main.rand.Next(4)
                 );
                 SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
@@ -1553,18 +1474,14 @@ private void DoAttack2()
         {
             Attack2ShootTimer = 0;
 
-            int projType = Main.rand.Next(4) switch
-            {
-                0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                _ => ModContent.ProjectileType<CycloneProjectile4>(),
-            };
             SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
             Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
             int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
-            Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f, projType, damage, 2f, Main.myPlayer);
+
+
+            Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,
+            ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
         }
 
         return;
@@ -1649,21 +1566,14 @@ private void DoAttack3()
                     float t      = (float)i / 4;
                     float spawnY = MathHelper.Lerp(CloneAttack3StartY, CloneAttack3EndY, t);
 
-                    int projType = Main.rand.Next(4) switch
-                    {
-                        0 => ModContent.ProjectileType<CycloneProjectile1>(),
-                        1 => ModContent.ProjectileType<CycloneProjectile2>(),
-                        2 => ModContent.ProjectileType<CycloneProjectile3>(),
-                        _ => ModContent.ProjectileType<CycloneProjectile4>(),
-                    };
                     SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
                     Projectile.NewProjectile(NPC.GetSource_FromAI(),
                         new Vector2(NPC.Center.X, spawnY),
-                        new Vector2(-8f, 0f), // fire left
-                        projType,
+                        new Vector2(-8f, 0f),
+                        ModContent.ProjectileType<CycloneProjectile>(),
                         NPC.GetAttackDamage_ForProjectiles(30f, 20f),
-                        2f, Main.myPlayer);
+                        2f, Main.myPlayer, ai0: Main.rand.Next(4));
                 }
             }
         }
@@ -1715,18 +1625,13 @@ private void DoAttack4()
         CloneAttack4ShootTimer = 0;
         CloneAttack4ShotsFired++;
 
-        int projType = Main.rand.Next(4) switch
-        {
-            0 => ModContent.ProjectileType<CycloneProjectile1>(),
-            1 => ModContent.ProjectileType<CycloneProjectile2>(),
-            2 => ModContent.ProjectileType<CycloneProjectile3>(),
-            _ => ModContent.ProjectileType<CycloneProjectile4>(),
-        };
+
         SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
         Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
         int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
-        Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f, projType, damage, 2f, Main.myPlayer);
+        Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,
+        ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
     }
 

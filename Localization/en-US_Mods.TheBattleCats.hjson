@@ -205,6 +205,7 @@ Projectiles: {
 	CycloneProjectile3.DisplayName: Cyclone Projectile3
 	CycloneProjectile2.DisplayName: Cyclone Projectile2
 	CycloneProjectile1.DisplayName: Cyclone Projectile1
+	CycloneProjectile.DisplayName: Cyclone Projectile
 	CycloneTelegraph.DisplayName: Cyclone Telegraph
 	TelegraphLines.DisplayName: Telegraph Lines
 	ExampleAdvancedFlailProjectile.DisplayName: Example Advanced Flail Projectile
