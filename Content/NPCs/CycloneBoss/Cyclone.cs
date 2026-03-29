@@ -21,9 +21,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         
         private enum ActionState
         {
-            Idle,
             Reset,
-            
+            Idle,
             Attack1,
             Attack2,
             Attack3,
@@ -38,7 +37,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float AITimer => ref NPC.ai[1];
         public ref float AttackTimer => ref NPC.ai[2];
         public ref float CloneTimer => ref NPC.ai[3];
-        private ActionState PreviousState = ActionState.Reset;
+        
 
         
 
@@ -132,7 +131,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
 
         private float LifeRatio;
-
+        
+        private ActionState PreviousState = ActionState.Reset;
         public override void AI()
         {
         
@@ -208,7 +208,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             }
         }
 
-        private ActionState previousAttack = ActionState.Idle;
+        private ActionState previousAttack = ActionState.Reset;
 
         
 
@@ -784,16 +784,29 @@ private void EnhancedAttack1()
         if (CloneTimer % 121 == 61 && Main.netMode != NetmodeID.MultiplayerClient)
         {
             float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-            Vector2 clonePos = player.Center + new Vector2(300f, 0f).RotatedBy(cloneAngle);
+            float radius = 300f;
+
+            Vector2 clonePos = player.Center + radius * new Vector2(
+                (float)Math.Cos(cloneAngle),
+                (float)Math.Sin(cloneAngle)
+            );
+
             clonePosX = clonePos.X;
             clonePosY = clonePos.Y;
             CreateTeleportTelegraph(clonePos);
             NPC.netUpdate = true;
         }
 
-        if (CloneTimer % 121 == 1 && CloneTimer > 2 && Main.netMode != NetmodeID.MultiplayerClient)
+        if (CloneTimer % 121 == 91 && CloneTimer > 2 && Main.netMode != NetmodeID.MultiplayerClient)
         {
-            int cloneIndex = NPC.NewNPC(NPC.GetSource_FromAI(), (int)clonePosX, (int)clonePosY, ModContent.NPCType<CycloneClone>());
+            int cloneIndex = NPC.NewNPC(
+                NPC.GetSource_FromAI(),
+                (int)clonePosX,
+                (int)clonePosY,
+                ModContent.NPCType<CycloneClone>()
+            );
+
+            Main.npc[cloneIndex].Center = new Vector2(clonePosX, clonePosY); //center the boss 
             Main.npc[cloneIndex].ai[1] = 1f;
             Main.npc[cloneIndex].netUpdate = true;
             SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
@@ -841,14 +854,9 @@ private void EnhancedAttack1()
 
 public static void CreateTeleportTelegraph(Vector2 teleportPosition, float cloudOpacity = 1f)
 {
-    Color fireColor = Main.rand.NextBool() ? Color.Purple : Color.Lime;
-    CloudParticle noxiousCloud = new(teleportPosition, Main.rand.NextVector2Circular(6f, 6f), fireColor * cloudOpacity, Color.DarkGray, 120, Main.rand.NextFloat(2f, 2.4f));
+    CloudParticle noxiousCloud = new(teleportPosition, Vector2.Zero, Color.White * cloudOpacity, Color.DarkGray, 120, Main.rand.NextFloat(1.4f, 1.8f));
     ParticleHandler.SpawnParticle(noxiousCloud);
 
-    Dust fire = Dust.NewDustPerfect(teleportPosition + Main.rand.NextVector2Square(-50f, 50f), DustID.CursedTorch);
-    fire.velocity = -Vector2.UnitY.RotateRandom(0.5f) * Main.rand.NextFloat(1f, 5f);
-    fire.scale *= 1.66f;
-    fire.noGravity = true;
 }
 
 private void SpawnRainVolley(Player player)
@@ -1344,8 +1352,8 @@ public class CycloneClone : ModNPC
 
     public override void SetDefaults()
     {
-        NPC.width         = 140;
-        NPC.height        = 140;
+        NPC.width         = 120;
+        NPC.height        = 120;
         NPC.damage        = 30;
         NPC.defense       = 0;
         NPC.lifeMax       = 1;
@@ -1470,7 +1478,10 @@ private void DoAttack1()
     Player player = Main.player[NPC.target];
     AITimer++;
 
-
+    if (AITimer == 25f)
+    {
+        DashDirection = Vector2.Normalize(player.Center - NPC.Center);
+    }
     // Frames 1–30: wait, fade in
     if (AITimer <= 30f)
     {
@@ -1485,7 +1496,6 @@ private void DoAttack1()
     // Frame 61: lock in dash direction
     if (!DashLaunched)
     {
-        DashDirection = Vector2.Normalize(player.Center - NPC.Center);
         DashLaunched  = true;
     }
 
