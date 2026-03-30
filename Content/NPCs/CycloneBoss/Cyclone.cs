@@ -23,10 +23,10 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Reset,
             Idle,
-            Attack1,
-            Attack2,
-            Attack3,
-            Attack4,
+            Dash,
+            CircleAndShoot,
+            SansWall,
+            FallingRocks,
             EnhancedAttack1,
             EnhancedAttack2,
             EnhancedAttack3,
@@ -163,17 +163,17 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Idle:
                     Idle();
                     break;
-                case (float)ActionState.Attack1:
-                    Attack1();
+                case (float)ActionState.Dash:
+                    DoBehavior_Dash();
                     break;
-                case (float)ActionState.Attack2:
-                    Attack2();
+                case (float)ActionState.CircleAndShoot:
+                    DoBehavior_CircleAndShoot();
                     break;
-                case (float)ActionState.Attack3:
-                    Attack3();
+                case (float)ActionState.SansWall:
+                    DoBehavior_SansWall();
                     break;
-                case (float)ActionState.Attack4:
-                    Attack4();
+                case (float)ActionState.FallingRocks:
+                    DoBehavior_FallingRocks();
                     break;
                 case (float)ActionState.EnhancedAttack1:
                     EnhancedAttack1();
@@ -204,7 +204,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             if (AITimer >= 120f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.Attack3;
+                AIState = (float)ActionState.SansWall;
             }
         }
 
@@ -231,10 +231,10 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 {
                     nextAttack = Main.rand.Next(4) switch
                     {
-                        0 => ActionState.Attack1,
-                        1 => ActionState.Attack2,
-                        2 => ActionState.Attack3,
-                        _ => ActionState.Attack4,
+                        0 => ActionState.Dash,
+                        1 => ActionState.CircleAndShoot,
+                        2 => ActionState.SansWall,
+                        _ => ActionState.FallingRocks,
                     };
                 }
                 else
@@ -269,7 +269,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private Vector2 LaunchDirection = Vector2.Zero;
         private float LaunchTimer = 0f;
 
-        private void Attack1()
+        private void DoBehavior_Dash()
         {
             Player player = Main.player[NPC.target];
             AITimer++;
@@ -334,7 +334,7 @@ private int   Attack2ShootTimer = 0;
 private float OrbitRadius2 = 400f;
 private const float OrbitSpeed2 = 0.02f;
 
-private void Attack2()
+private void DoBehavior_CircleAndShoot()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
@@ -426,7 +426,7 @@ private float Attack3SubAttack = 0f;
 private float Attack3StartY    = 0f;
 private float Attack3EndY      = 0f;
 
-private void Attack3()
+private void DoBehavior_SansWall()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
@@ -552,7 +552,7 @@ private float Attack4HoverTimer = 0f;
 private float Attack4ShootTimer = 0f;
 private float OrbitRadius4 = 500f;
 
-private void Attack4()
+private void DoBehavior_FallingRocks()
 {
     Player player = Main.player[NPC.target];
     AITimer++;
