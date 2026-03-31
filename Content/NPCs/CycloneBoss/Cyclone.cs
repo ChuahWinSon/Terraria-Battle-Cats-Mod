@@ -23,6 +23,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Reset,
             Idle,
+            TripleDashAttack,
             Dash,
             CircleAndShoot,
             SansWall,
@@ -163,6 +164,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.Idle:
                     Idle();
                     break;
+                case (float)ActionState.TripleDashAttack:
+                    DoBehavior_TripleDashAttack();
+                    break;
                 case (float)ActionState.Dash:
                     DoBehavior_Dash();
                     break;
@@ -252,7 +256,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             while (nextAttack == previousAttack); // never repeat the same attack twice
 
 
-            // nextAttack = ActionState.EnhancedAttack1; //testing
+            // ActionState nextAttack = ActionState.TripleDashAttack; //testing
 
 
             previousAttack = nextAttack;
@@ -260,6 +264,165 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             AITimer = 0f;
             NPC.netUpdate = true;
         }
+
+
+private int dashCount = 0;
+private Vector2 dashTarget;
+
+private void DoBehavior_TripleDashAttack()
+{
+    AITimer++;
+
+    Player player = Main.player[NPC.target];
+
+    
+
+    // if (AITimer <= 60)
+    // {
+
+    //     return;
+    // }
+
+    // Phase 1: Reposition above player 
+    if (AITimer <= 120)
+{
+    Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+    Vector2 toTarget = targetPos - NPC.Center;
+    float dist = toTarget.Length();
+
+    // Spiral: orbit angle spins faster as it closes in
+    float spiralAngle = AITimer * 0.18f;
+    float spiralRadius = MathHelper.Clamp(dist * 0.4f, 0f, 120f); // shrinks as it gets closer
+    Vector2 spiralOffset = new Vector2(
+        (float)Math.Cos(spiralAngle),
+        (float)Math.Sin(spiralAngle)
+    ) * spiralRadius;
+
+    // Wobble on top of the spiral
+    float wobble = (float)Math.Sin(AITimer * 0.3f) * (dist * 0.05f); // fades as dist shrinks
+    Vector2 wobbleOffset = Vector2.Normalize(toTarget).RotatedBy(MathHelper.PiOver2) * wobble;
+
+    float maxSpeed = MathHelper.Clamp(AITimer * 0.25f, 1f, 18f);
+    Vector2 idealVelocity = Vector2.Normalize(toTarget + spiralOffset + wobbleOffset)
+                            * Math.Min(dist * 0.08f, maxSpeed);
+
+    NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
+
+    NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+
+    if (AITimer == 120)
+    {
+        NPC.velocity = Vector2.Zero;
+        dashCount = 0;
+    }
+    return;
+}
+
+    // ─── Phase 2: Triple dash sequence ────────────────────────────────────
+    // Dash timing layout (relative to attackTimer):
+    //   Frame 31–50  → windup pause before dash 1
+    //   Frame 51     → Dash 1 fires (DOWN)
+    //   Frame 52–80  → dash 1 travel / decelerate
+    //   Frame 81–95  → pause before dash 2
+    //   Frame 96     → Dash 2 fires (UP, back to position above player)
+    //   Frame 97–125 → dash 2 travel / decelerate
+    //   Frame 126–140→ pause before dash 3 + shoot projectiles
+    //   Frame 141    → Dash 3 fires (DOWN, with projectiles)
+    //   Frame 142–170→ dash 3 travel / decelerate
+    //   Frame 171+   → reset / transition to next attack
+
+    int localFrame = (int)AITimer - 120;
+
+
+    // --- Dash 1: DOWN ---
+    if (localFrame == 10) // windup done, launch
+    {
+        dashCount = 1;
+        Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
+        NPC.velocity = direction * 28f;
+    }
+
+    // --- Dash 2: UP (back above player) ---
+    if (localFrame == 60)
+    {
+        dashCount = 2;
+        Vector2 returnPos = player.Center + new Vector2(0f, -250f); // above player
+        Vector2 direction = Vector2.Normalize(returnPos - NPC.Center);
+        NPC.velocity = direction * 26f;
+    }
+
+    // --- Dash 3: DOWN + projectiles ---
+    if (localFrame == 120)
+    {
+        // Shoot 5 projectiles in a spread BEFORE the dash
+        ShootSpreadProjectiles(Main.player[NPC.target]);
+    }
+
+    if (localFrame == 121)
+    {
+        dashCount = 3;
+        Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player again
+        NPC.velocity = direction * 32f;
+    }
+
+    // --- Decelerate after each dash launch ---
+    if (dashCount > 0)
+    {
+        NPC.velocity *= 0.92f; // friction; tweak for feel
+    }
+
+    // --- Reset after full sequence ---
+    if (localFrame >= 181)
+    {
+        AITimer = 0f;
+        dashCount = 0;
+        NPC.velocity = Vector2.Zero;
+        AIState = (float)ActionState.Reset; // ← add this
+        NPC.netUpdate = true;               // ← and this
+    }
+}
+
+private void ShootSpreadProjectiles(Player target)
+{
+    if (!Main.dedServ) // skip visual-only logic on server if needed
+    {
+        // Optional: spawn a telegraph dust/particle burst here
+    }
+
+    int projDamage  = 40;
+    float projSpeed = 14f;
+    int spreadCount = 5;
+    float spreadAngle = MathHelper.ToRadians(45f); // total arc in degrees
+
+    // Direction toward the player (downward in this context)
+    Vector2 baseDirection = Vector2.Normalize(target.Center - NPC.Center);
+
+    for (int i = 0; i < spreadCount; i++)
+    {
+        // Evenly space projectiles across the spread arc
+        float lerpT   = spreadCount == 1 ? 0.5f : i / (float)(spreadCount - 1);
+        float rotation = MathHelper.Lerp(-spreadAngle / 2f, spreadAngle / 2f, lerpT);
+
+        Vector2 velocity = baseDirection.RotatedBy(rotation) * projSpeed;
+
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),
+                NPC.Center,
+                velocity,
+                ModContent.ProjectileType<CycloneProjectile>(),
+                projDamage,
+                2f,        // knockback
+                Main.myPlayer,
+                ai0: Main.rand.Next(4)
+            );
+        }
+    }
+}
+
+
+                    
 
         // orbit state variables
         private float OrbitAngle = 0f;        // current angle around the player
@@ -323,7 +486,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 AITimer = 0f;
                 OrbitAngle = 0f;
                 LaunchDirection = Vector2.Zero;
-                AIState = (float)ActionState.Reset;
+                AIState = (float)ActionState.TripleDashAttack;
 
             }
         }
@@ -414,7 +577,7 @@ private void DoBehavior_CircleAndShoot()
         AITimer           = 0f;
         Attack2OrbitAngle = 0f;
         Attack2ShootTimer = 0;
-        AIState = (float)ActionState.Reset;
+        AIState = (float)ActionState.TripleDashAttack;
 
     }
 }
@@ -489,7 +652,7 @@ private void DoBehavior_SansWall()
     {
         NPC.alpha  = 0;
         AITimer    = 0f;
-        AIState = (float)ActionState.Reset;
+        AIState = (float)ActionState.TripleDashAttack;
 
     }
 }
@@ -656,7 +819,7 @@ private void DoBehavior_FallingRocks()
                 Attack4HoverTimer = 0f;
                 Attack4Angle      = 0f;
                 AITimer           = 0f;
-                AIState = (float)ActionState.Reset;
+                AIState = (float)ActionState.TripleDashAttack;
 
             }
         }
