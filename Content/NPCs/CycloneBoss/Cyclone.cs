@@ -11,6 +11,8 @@ using Terraria.GameContent;
 using ReLogic.Content;
 using Terraria.GameContent.LootSimulation.LootSimulatorConditionSetterTypes;
 using TheBattleCats.Common.Graphics.Particles;
+using TheBattleCats.Common.Systems; 
+using Terraria.Graphics.CameraModifiers;
 
 namespace TheBattleCats.Content.NPCs.CycloneBoss
 {
@@ -21,7 +23,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         
         private enum ActionState
         {
+            Spawn,
             Reset,
+            
             Idle,
             TripleDashAttack,
             Dash,
@@ -54,8 +58,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             NPC.knockBackResist = 0f;
             NPC.noGravity = true;
             NPC.noTileCollide = true;
-            NPC.width = 120;
-            NPC.height = 120;
+            NPC.width = 110;
+            NPC.height = 110;
             NPC.boss = true;
         }
 
@@ -86,15 +90,33 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Main.npcFrameCount[NPC.type] = 29;
         }
 
+        // For sprite glitches
+        public override void OnKill()
+        {
+            roarTimer = 0;
+            Main.npcFrameCount[NPC.type] = 29;
+        }
+
+        public override void OnSpawn(IEntitySource source)
+        {
+            roarTimer = 0;
+            NPC.frame.Y = 0;
+            Main.npcFrameCount[NPC.type] = 29;
+        }
 
         public override void FindFrame(int frameHeight)
         {
+            // Use the correct frame height for whichever sheet is active
+            int activeFrameCount = Main.npcFrameCount[NPC.type]; // already swapped by TriggerRoar
+            Texture2D activeTex  = IsRoaring ? RoarTexture.Value : TextureAssets.Npc[NPC.type].Value;
+            int correctHeight    = activeTex.Height / activeFrameCount;
+
             NPC.frameCounter++;
-            if (NPC.frameCounter >= 4) // 12 fps
+            if (NPC.frameCounter >= 4)
             {
                 NPC.frameCounter = 0;
-                NPC.frame.Y += frameHeight;
-                if (NPC.frame.Y >= frameHeight * Main.npcFrameCount[NPC.type])
+                NPC.frame.Y += correctHeight;
+                if (NPC.frame.Y >= correctHeight * activeFrameCount)
                     NPC.frame.Y = 0;
             }
         }
@@ -130,6 +152,41 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         // }
 
 
+        public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
+        {
+            Texture2D tex = IsRoaring
+                ? RoarTexture.Value
+                : TextureAssets.Npc[NPC.type].Value;
+
+            int frameCount = Main.npcFrameCount[NPC.type];
+            int correctFrameHeight = tex.Height / frameCount;
+            Rectangle frame    = new Rectangle(0, NPC.frame.Y, tex.Width, correctFrameHeight);
+            Vector2 origin     = frame.Size() / 2f;
+            Vector2 pos        = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+            SpriteEffects flip = NPC.spriteDirection == -1 ? SpriteEffects.None : SpriteEffects.FlipHorizontally;
+
+            spriteBatch.Draw(tex, pos, frame, NPC.GetAlpha(drawColor), NPC.rotation, origin, NPC.scale, flip, 0f);
+
+            return false;
+
+        }
+
+        public static Asset<Texture2D> RoarTexture;
+        private int roarTimer = 0;
+        private bool IsRoaring => roarTimer > 0;
+        public override void Load()
+        {
+            RoarTexture = ModContent.Request<Texture2D>("TheBattleCats/Content/NPCs/CycloneBoss/Cyclone_Roar");
+        }
+        private void TriggerRoar(int duration = 60)
+        {
+            roarTimer = duration;
+            NPC.frame.Y = 0;
+            Main.npcFrameCount[NPC.type] = 6; // however many frames your roar sheet has
+        }
+
+        public override void Unload() => RoarTexture = null;
+
 
         private float LifeRatio;
         
@@ -137,6 +194,15 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void AI()
         {
         
+            if (roarTimer > 0)
+            {
+                roarTimer--;
+                if (roarTimer == 0)
+                {
+                    NPC.frame.Y = 0;
+                    Main.npcFrameCount[NPC.type] = 29; // back to normal
+                }
+            }
 
             NPC.TargetClosest(true);
             Player player = Main.player[NPC.target];
@@ -160,6 +226,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             {
                 case (float)ActionState.Reset:
                     DoBehavior_ResetAI();
+                    break;
+                case (float)ActionState.Spawn:
+                    DoBehavior_SpawnAnimation();
                     break;
                 case (float)ActionState.Idle:
                     Idle();
@@ -197,6 +266,39 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
 
 
+        }
+
+        private void DoBehavior_SpawnAnimation()
+        {
+            if (AITimer == 0)
+            {
+                // Only trigger camera on client
+                if (Main.netMode != NetmodeID.Server)
+                    BossCameraSystem.StartBossPan(NPC.Center, panDuration: 90, holdDuration: 210);
+            }
+            AITimer++;
+
+            if (AITimer < 120)
+            {
+                NPC.alpha = (int)MathHelper.Lerp(255, 0, (AITimer-60) / 60f);
+                return;
+            }
+
+            if (AITimer == 180)
+            {
+                SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+                TriggerRoar(60);
+
+                if (Main.netMode != NetmodeID.Server)
+                    BossCameraSystem.TriggerShake(60f); // increase for stronger shake
+            }
+
+
+            if (AITimer >= 300f)
+            {
+                AITimer = 0f;
+                AIState = (float)ActionState.TripleDashAttack;
+            }
         }
 
         private void Idle()
@@ -286,7 +388,7 @@ private void DoBehavior_TripleDashAttack()
     // Phase 1: Reposition above player 
     if (AITimer <= 120)
 {
-    Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+    Vector2 targetPos = player.Center + new Vector2(0f, -100f);
     Vector2 toTarget = targetPos - NPC.Center;
     float dist = toTarget.Length();
 
@@ -335,20 +437,26 @@ private void DoBehavior_TripleDashAttack()
 
 
     // --- Dash 1: DOWN ---
-    if (localFrame == 10) // windup done, launch
+    if (localFrame == 1) // windup done, launch
     {
         dashCount = 1;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
-        NPC.velocity = direction * 28f;
+        NPC.velocity = direction * 20f;
+
+        SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+TriggerRoar(30);
     }
 
     // --- Dash 2: UP (back above player) ---
     if (localFrame == 60)
     {
         dashCount = 2;
-        Vector2 returnPos = player.Center + new Vector2(0f, -250f); // above player
+        Vector2 returnPos = player.Center + new Vector2(0f, -400f); // above player
         Vector2 direction = Vector2.Normalize(returnPos - NPC.Center);
-        NPC.velocity = direction * 26f;
+        NPC.velocity = direction * 20f;
+
+        SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+TriggerRoar(30);
     }
 
     // --- Dash 3: DOWN + projectiles ---
@@ -356,23 +464,26 @@ private void DoBehavior_TripleDashAttack()
     {
         // Shoot 5 projectiles in a spread BEFORE the dash
         ShootSpreadProjectiles(Main.player[NPC.target]);
+
+        SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+TriggerRoar(50);
     }
 
     if (localFrame == 121)
     {
         dashCount = 3;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player again
-        NPC.velocity = direction * 32f;
+        NPC.velocity = direction * 20f;
     }
 
     // --- Decelerate after each dash launch ---
     if (dashCount > 0)
     {
-        NPC.velocity *= 0.92f; // friction; tweak for feel
+        NPC.velocity *= 0.96f; // friction; tweak for feel
     }
 
     // --- Reset after full sequence ---
-    if (localFrame >= 181)
+    if (localFrame >= 241)
     {
         AITimer = 0f;
         dashCount = 0;
@@ -1436,8 +1547,8 @@ public class CycloneClone : ModNPC
 
     public override void SetDefaults()
     {
-        NPC.width         = 120;
-        NPC.height        = 120;
+        NPC.width         = 110;
+        NPC.height        = 110;
         NPC.damage        = 30;
         NPC.defense       = 0;
         NPC.lifeMax       = 1;
