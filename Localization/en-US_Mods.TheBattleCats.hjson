@@ -113,6 +113,11 @@ Items: {
 		Tooltip: ""
 		DisplayName: Example Advanced Flail
 	}
+
+	CycloneSummonItem: {
+		Tooltip: ""
+		DisplayName: Cyclone Summon Item
+	}
 }
 
 Buffs: {
