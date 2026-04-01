@@ -171,6 +171,36 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         }
 
+        public override void HitEffect(NPC.HitInfo hit) {
+			// If the NPC dies, spawn gore and play a sound
+			if (Main.netMode == NetmodeID.Server) {
+				// We don't want Mod.Find<ModGore> to run on servers as it will crash because gores are not loaded on servers
+				return;
+			}
+
+			if (NPC.life <= 0) {
+				// These gores work by simply existing as a texture inside any folder which path contains "Gores/"
+				int backGoreType = Mod.Find<ModGore>("CycloneBossBody_Bottom").Type;
+				int frontGoreType = Mod.Find<ModGore>("CycloneBossBody_Top").Type;
+                int eyeGoreType = Mod.Find<ModGore>("CycloneBossEye").Type;
+
+				var entitySource = NPC.GetSource_Death();
+
+				for (int i = 0; i < 2; i++) {
+					Gore.NewGore(entitySource, NPC.position, new Vector2(Main.rand.Next(-6, 7), Main.rand.Next(-6, 7)), backGoreType);
+					Gore.NewGore(entitySource, NPC.position, new Vector2(Main.rand.Next(-6, 7), Main.rand.Next(-6, 7)), frontGoreType);
+                    
+				}
+                Gore.NewGore(entitySource, NPC.position, new Vector2(Main.rand.Next(-3, 3), Main.rand.Next(-3, 3)), eyeGoreType);
+
+				// This adds a screen shake (screenshake) similar to Deerclops
+				SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+
+                if (Main.netMode != NetmodeID.Server)
+                    BossCameraSystem.TriggerShake(10f); // increase for stronger shake
+			}
+		}
+
         public static Asset<Texture2D> RoarTexture;
         private int roarTimer = 0;
         private bool IsRoaring => roarTimer > 0;
