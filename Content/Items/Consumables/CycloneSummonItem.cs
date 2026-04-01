@@ -2,11 +2,12 @@ using Terraria;
 using Terraria.Audio;
 using Terraria.ID;
 using Terraria.ModLoader;
-using TheBattleCats.Content.NPCs.TeacherBunbunBoss;
+using TheBattleCats.Content.NPCs.CycloneBoss;
+using TheBattleCats.Common.Systems; 
 
 namespace TheBattleCats.Content.Items.Consumables
 {
-	public class BunbunSummonItem : ModItem
+	public class CycloneSummonItem : ModItem
     {
         public override void SetStaticDefaults()
         {
@@ -33,7 +34,7 @@ namespace TheBattleCats.Content.Items.Consumables
 			// If you decide to use the below UseItem code, you have to include !NPC.AnyNPCs(id), as this is also the check the server does when receiving MessageID.SpawnBoss.
 			// If you want more constraints for the summon item, combine them as boolean expressions:
 			//    return !Main.IsItDay() && !NPC.AnyNPCs(ModContent.NPCType<MinionBossBody>()); would mean "not daytime and no MinionBossBody currently alive"
-			return !NPC.AnyNPCs(ModContent.NPCType<TeacherBunbun>());
+			return !NPC.AnyNPCs(ModContent.NPCType<Cyclone>());
 		}
 
 		public override bool? UseItem(Player player) {
@@ -50,13 +51,22 @@ namespace TheBattleCats.Content.Items.Consumables
 				// Play the sound at NPC's position
 				SoundEngine.PlaySound(customSound, player.position);
 
-				int type = ModContent.NPCType<TeacherBunbun>();
+				int type = ModContent.NPCType<Cyclone>();
+                int spawnX = (int)player.Center.X + (player.direction * 200);
+                int spawnY = (int)player.Center.Y - 200;
 
 				if (Main.netMode != NetmodeID.MultiplayerClient) {
-					// If the player is not in multiplayer, spawn directly
-					NPC.SpawnOnPlayer(player.whoAmI, type);
-				}
-				else {
+                // Spawn directly at player's center position (on-screen)
+                int npcIndex = NPC.NewNPC(
+                    NPC.GetBossSpawnSource(player.whoAmI),
+                    spawnX,
+                    spawnY, 
+                    type
+                );
+
+                
+            }
+                            else {
 					// If the player is in multiplayer, request a spawn
 					// This will only work if NPCID.Sets.MPAllowedEnemies[type] is true, which we set in MinionBossBody
 					NetMessage.SendData(MessageID.SpawnBossUseLicenseStartEvent, number: player.whoAmI, number2: type);
