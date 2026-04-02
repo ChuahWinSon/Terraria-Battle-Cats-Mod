@@ -224,6 +224,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private ActionState PreviousState = ActionState.Reset;
         public override void AI()
         {
+
+            // makes movement look more fluid
+            NPC.rotation = MathHelper.Clamp(NPC.velocity.X * 0.04f, -MathHelper.Pi / 6f, MathHelper.Pi / 6f);
         
             if (roarTimer > 0)
             {
@@ -340,7 +343,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 if (AITimer == 120)
                 {
                     NPC.velocity = Vector2.Zero;
-                    dashCount = 0;
                 }
                 return;
             }
@@ -355,7 +357,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 ShootLingeringRockProjectiles();
             }
 
-            if (AITimer >= 240f)
+            if (AITimer >= 210f)
             {
                 AITimer = 0f;
                 AIState = (float)ActionState.TripleDashAttack;
@@ -504,60 +506,40 @@ private Vector2 dashTarget;
 
 private void DoBehavior_TripleDashAttack()
 {
-    AITimer++;
-
     Player player = Main.player[NPC.target];
 
-
-    // Phase 1: Reposition above player 
-    if (AITimer <= 120)
-{
-    Vector2 targetPos = player.Center + new Vector2(0f, -100f);
-    Vector2 toTarget = targetPos - NPC.Center;
-    float dist = toTarget.Length();
-
-    // Spiral: orbit angle spins faster as it closes in
-    float spiralAngle = AITimer * 0.18f;
-    float spiralRadius = MathHelper.Clamp(dist * 0.4f, 0f, 120f); // shrinks as it gets closer
-    Vector2 spiralOffset = new Vector2(
-        (float)Math.Cos(spiralAngle),
-        (float)Math.Sin(spiralAngle)
-    ) * spiralRadius;
-
-    // Wobble on top of the spiral
-    float wobble = (float)Math.Sin(AITimer * 0.3f) * (dist * 0.05f); // fades as dist shrinks
-    Vector2 wobbleOffset = Vector2.Normalize(toTarget).RotatedBy(MathHelper.PiOver2) * wobble;
-
-    float maxSpeed = MathHelper.Clamp(AITimer * 0.25f, 1f, 18f);
-    Vector2 idealVelocity = Vector2.Normalize(toTarget + spiralOffset + wobbleOffset)
-                            * Math.Min(dist * 0.08f, maxSpeed);
-
-    NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
-
-    NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
-
-    if (AITimer == 120)
+    // Phase 1: move to above player while AITimer is negative
+    if (AITimer <= 0)
     {
-        NPC.velocity = Vector2.Zero;
-        dashCount = 0;
+        Vector2 targetPos = player.Center + new Vector2(0f, -200f);
+        Vector2 toTarget = targetPos - NPC.Center;
+        float dist = toTarget.Length();
+
+        float rampFrames = -AITimer; // AITimer is negative, so this gives a positive frame count
+        float maxSpeed = MathHelper.Clamp(rampFrames * 0.1f, 1f, 30f);
+        Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
+        NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
+        NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+
+        if (dist <= 180f && AITimer <= -180) // at least 120 frames
+        {
+            NPC.velocity = Vector2.Zero;
+            dashCount = 0;
+            AITimer = 1f; // kick into phase 2
+        }
+        else
+        {
+            AITimer--; // keep decrementing while still moving
+        }
+
+        return;
     }
-    return;
-}
 
-    // ─── Phase 2: Triple dash sequence ────────────────────────────────────
-    // Dash timing layout (relative to attackTimer):
-    //   Frame 31–50  → windup pause before dash 1
-    //   Frame 51     → Dash 1 fires (DOWN)
-    //   Frame 52–80  → dash 1 travel / decelerate
-    //   Frame 81–95  → pause before dash 2
-    //   Frame 96     → Dash 2 fires (UP, back to position above player)
-    //   Frame 97–125 → dash 2 travel / decelerate
-    //   Frame 126–140→ pause before dash 3 + shoot projectiles
-    //   Frame 141    → Dash 3 fires (DOWN, with projectiles)
-    //   Frame 142–170→ dash 3 travel / decelerate
-    //   Frame 171+   → reset / transition to next attack
+    // Phase 2
+    AITimer++;
 
-    int localFrame = (int)AITimer - 120;
+
+    int localFrame = (int)AITimer-1;
 
 
     // --- Dash 1: DOWN ---
@@ -565,7 +547,7 @@ private void DoBehavior_TripleDashAttack()
     {
         dashCount = 1;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
-        NPC.velocity = direction * 20f;
+        NPC.velocity = direction * 24f;
 
         SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
 TriggerRoar(30);
@@ -577,7 +559,7 @@ TriggerRoar(30);
         dashCount = 2;
         Vector2 returnPos = player.Center + new Vector2(0f, -400f); // above player
         Vector2 direction = Vector2.Normalize(returnPos - NPC.Center);
-        NPC.velocity = direction * 20f;
+        NPC.velocity = direction * 24f;
 
         SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
 TriggerRoar(30);
@@ -597,7 +579,7 @@ TriggerRoar(50);
     {
         dashCount = 3;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player again
-        NPC.velocity = direction * 20f;
+        NPC.velocity = direction * 24f;
     }
 
     // --- Decelerate after each dash launch ---
@@ -607,7 +589,7 @@ TriggerRoar(50);
     }
 
     // --- Reset after full sequence ---
-    if (localFrame >= 241)
+    if (localFrame >= 181)
     {
         AITimer = 0f;
         dashCount = 0;

@@ -147,8 +147,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void SetDefaults()
         {
-            Projectile.width = 30;
-            Projectile.height = 30;
+            Projectile.width = 40;
+            Projectile.height = 40;
             Projectile.hostile = true;
             Projectile.friendly = false;
             Projectile.tileCollide = false; // we handle tile detection manually
