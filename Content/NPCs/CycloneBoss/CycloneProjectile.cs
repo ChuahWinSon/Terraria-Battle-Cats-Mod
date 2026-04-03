@@ -91,6 +91,15 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
     {
         Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
 
+        if (Projectile.ai[1] == 1f)
+        {
+            Projectile.ai[2]++;
+            if (Projectile.ai[2] % 10 == 0)
+            {
+                Projectile.velocity.X += Projectile.velocity.X > 0 ? 1f : -1f;
+            }
+        }
+
         if (Main.rand.NextBool(5))
         {
             Dust d = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Stone);

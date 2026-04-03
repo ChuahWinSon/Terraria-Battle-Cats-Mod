@@ -491,7 +491,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             // while (nextAttack == previousAttack); // never repeat the same attack twice
 
 
-            ActionState nextAttack = ActionState.LingeringRocks; //testing
+            ActionState nextAttack = ActionState.CircleAndShoot; //testing
 
 
             previousAttack = nextAttack;
@@ -516,12 +516,12 @@ private void DoBehavior_TripleDashAttack()
         float dist = toTarget.Length();
 
         float rampFrames = -AITimer; // AITimer is negative, so this gives a positive frame count
-        float maxSpeed = MathHelper.Clamp(rampFrames * 0.1f, 1f, 30f);
+        float maxSpeed = MathHelper.Clamp(rampFrames * 0.1f, 1f, 40f);
         Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
         NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
         NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
 
-        if (dist <= 180f && AITimer <= -180) // at least 120 frames
+        if (dist <= 180f && AITimer <= -180 || AITimer < -360) // at least 180 frames and close or already been 600 frames
         {
             NPC.velocity = Vector2.Zero;
             dashCount = 0;
@@ -554,11 +554,10 @@ TriggerRoar(30);
     }
 
     // --- Dash 2: UP (back above player) ---
-    if (localFrame == 60)
+    if (localFrame == 45)
     {
         dashCount = 2;
-        Vector2 returnPos = player.Center + new Vector2(0f, -400f); // above player
-        Vector2 direction = Vector2.Normalize(returnPos - NPC.Center);
+        Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
         NPC.velocity = direction * 24f;
 
         SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
@@ -566,7 +565,7 @@ TriggerRoar(30);
     }
 
     // --- Dash 3: DOWN + projectiles ---
-    if (localFrame == 120)
+    if (localFrame == 90)
     {
         // Shoot 5 projectiles in a spread BEFORE the dash
         ShootSpreadProjectiles(Main.player[NPC.target]);
@@ -575,7 +574,7 @@ TriggerRoar(30);
 TriggerRoar(50);
     }
 
-    if (localFrame == 121)
+    if (localFrame == 91)
     {
         dashCount = 3;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player again
@@ -585,11 +584,11 @@ TriggerRoar(50);
     // --- Decelerate after each dash launch ---
     if (dashCount > 0)
     {
-        NPC.velocity *= 0.96f; // friction; tweak for feel
+        NPC.velocity *= 0.98f; // friction; tweak for feel
     }
 
     // --- Reset after full sequence ---
-    if (localFrame >= 181)
+    if (localFrame >= 151)
     {
         AITimer = 0f;
         dashCount = 0;
@@ -719,36 +718,31 @@ private void DoBehavior_CircleAndShoot()
     Player player = Main.player[NPC.target];
     AITimer++;
 
-    // Phase 1: disappear (0-60 ticks)
-    if (AITimer < 60f)
+    // Phase 1: move to nearest orbit point (0-60 ticks)
+    if (AITimer == 1f)
     {
-        NPC.velocity = Vector2.Zero;
-        NPC.alpha    = (int)MathHelper.Lerp(0, 255, AITimer / 60f);
+        // Calculate the angle from player to NPC, snap to that orbit point
+        Attack2OrbitAngle = (NPC.Center - player.Center).ToRotation();
+        NPC.netUpdate = true;
+    }
+
+    if (AITimer <= 60f)
+    {
+        Vector2 targetPos     = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
+        float dist            = Vector2.Distance(NPC.Center, targetPos);
+        NPC.velocity          = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(dist * 0.1f, 2f, 20f);
         return;
-        
     }
 
-    // Phase 2: teleport to random position around player
-    if (AITimer == 61f)
-    {
-        Attack2OrbitAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-        NPC.Center        = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
-        NPC.alpha         = 255;
-        NPC.velocity      = Vector2.Zero;
-        NPC.netUpdate     = true;
-    }
-
-    // Phase 3: orbit continuously while shooting
+    // Phase 2: orbit continuously while shooting
     if (AITimer >= 61f && AITimer < 360f)
     {
-        // Fade in over first 60 ticks of orbit
-        NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 61f) / 60f, 1f));
 
         Attack2OrbitAngle += OrbitSpeed2;
 
         Vector2 targetPos     = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
         Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
-        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
+        NPC.velocity          = Vector2.Lerp(NPC.velocity, idealVelocity, 0.15f);
 
         NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
         NPC.spriteDirection = NPC.direction;
@@ -819,31 +813,12 @@ private void DoBehavior_SansWall()
     Vector2 toTarget = targetPos - NPC.Center;
     float dist = toTarget.Length();
 
-    // Spiral: orbit angle spins faster as it closes in
-    float spiralAngle = AITimer * 0.18f;
-    float spiralRadius = MathHelper.Clamp(dist * 0.4f, 0f, 120f); // shrinks as it gets closer
-    Vector2 spiralOffset = new Vector2(
-        (float)Math.Cos(spiralAngle),
-        (float)Math.Sin(spiralAngle)
-    ) * spiralRadius;
-
-    // Wobble on top of the spiral
-    float wobble = (float)Math.Sin(AITimer * 0.3f) * (dist * 0.05f); // fades as dist shrinks
-    Vector2 wobbleOffset = Vector2.Normalize(toTarget).RotatedBy(MathHelper.PiOver2) * wobble;
-
-    float maxSpeed = MathHelper.Clamp(AITimer * 0.25f, 1f, 18f);
-    Vector2 idealVelocity = Vector2.Normalize(toTarget + spiralOffset + wobbleOffset)
-                            * Math.Min(dist * 0.08f, maxSpeed);
+    float maxSpeed = MathHelper.Clamp(AITimer * 0.25f, 10f, 20f);
+    Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
 
     NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
 
-    
 
-    if (AITimer == 60)
-    {
-        NPC.velocity = Vector2.Zero;
-        dashCount = 0;
-    }
     return;
 }
 
@@ -916,7 +891,7 @@ private void FireWallVolley(Player player)
     if (Main.netMode == NetmodeID.MultiplayerClient) return;
 
     int   bulletCount = 5;
-    float speed       = 10f;
+    float speed       = 4f;
     int   damage      = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
     float direction   = NPC.Center.X < player.Center.X ? 1f : -1f;
 
@@ -936,7 +911,8 @@ private void FireWallVolley(Player player)
             damage,
             2f,
             Main.myPlayer,
-            ai0: variant
+            ai0: variant,
+            ai1: 1f
         );
     }
 }
