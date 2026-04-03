@@ -150,88 +150,100 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         }
     }
 
-    public class ClusteredRock : ModProjectile
+public class ClusteredRock : ModProjectile
+{
+    private bool haspeaked = false;
+
+    public override void SetDefaults()
     {
-        private bool haspeaked = false;
+        Projectile.width = 40;
+        Projectile.height = 40;
+        Projectile.hostile = true;
+        Projectile.friendly = false;
+        Projectile.tileCollide = false;
+        Projectile.ignoreWater = true;
+        Projectile.timeLeft = 600;
+        Projectile.penetrate = -1;
+    }
 
-        public override void SetDefaults()
+    public override void AI()
+    {
+        if (Main.rand.NextBool(5))
         {
-            Projectile.width = 40;
-            Projectile.height = 40;
-            Projectile.hostile = true;
-            Projectile.friendly = false;
-            Projectile.tileCollide = false; // we handle tile detection manually
-            Projectile.ignoreWater = true;
-            Projectile.timeLeft = 600;
-            Projectile.penetrate = -1;
+            Dust d = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Stone);
+            d.velocity = Main.rand.NextVector2Circular(2f, 2f);
+            d.scale = Main.rand.NextFloat(0.8f, 1.4f);
+            d.noGravity = false;
         }
 
-        public override void AI()
+        Projectile.velocity.Y += 0.2f;
+
+        if (Projectile.velocity.Y >= 0f)
+            haspeaked = true;
+
+        Projectile.rotation += Projectile.velocity.X * 0.05f;
+
+        if (haspeaked)
         {
+            // Check the bottom edge of the projectile, not the center
+            // This fires as soon as the feet touch a tile rather than when
+            // the center has already buried itself inside one
+            Vector2 bottomCenter = new Vector2(Projectile.Center.X, Projectile.Bottom.Y);
+            Point tilePos = bottomCenter.ToTileCoordinates();
+            Tile tile = Framing.GetTileSafely(tilePos.X, tilePos.Y);
 
-            if (Main.rand.NextBool(5))
+            if (tile.HasTile && Main.tileSolid[tile.TileType])
             {
-                Dust d = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Stone);
-                d.velocity = Main.rand.NextVector2Circular(2f, 2f);
-                d.scale = Main.rand.NextFloat(0.8f, 1.4f);
-                d.noGravity = false;
+                OnHitTile();
             }
-
-            Projectile.velocity.Y += 0.2f;
-
-            // Peak detection is now just for tile collision gating
-            if (Projectile.velocity.Y >= 0f)
-                haspeaked = true;
-
-            Projectile.rotation += Projectile.velocity.X * 0.05f;
-
-            if (haspeaked)
-            {
-                Point tilePos = Projectile.Center.ToTileCoordinates();
-                Tile tile = Framing.GetTileSafely(tilePos.X, tilePos.Y);
-
-                if (tile.HasTile && Main.tileSolid[tile.TileType])
-                {
-                    OnHitTile();
-                }
-            }
-        }
-
-        private void OnHitTile()
-        {
-            if (Projectile.active && Main.netMode != NetmodeID.MultiplayerClient)
-            {
-                // Find the first solid tile below the projectile's center
-                Point tilePos = Projectile.Center.ToTileCoordinates();
-                
-                while (tilePos.Y < Main.maxTilesY)
-                {
-                    Tile tile = Main.tile[tilePos.X, tilePos.Y];
-                    if (tile.HasTile && Main.tileSolid[tile.TileType])
-                        break;
-                    tilePos.Y++;
-                }
-
-                // Snap spawn position to the exact top surface of that tile
-                Vector2 spawnPos = new Vector2(
-                    tilePos.X * 16 + 8,
-                    tilePos.Y * 16 - 12       
-                );
-
-                Projectile.NewProjectile(
-                    Projectile.GetSource_FromThis(),
-                    spawnPos,
-                    Vector2.Zero,
-                    ModContent.ProjectileType<LingeringRock>(),
-                    Projectile.damage,
-                    0f,
-                    Main.myPlayer
-                );
-            }
-
-            Projectile.Kill();
         }
     }
+
+    private void OnHitTile()
+    {
+        if (Projectile.active && Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            // Start scan from the bottom edge tile, not the center
+            // This avoids re-scanning tiles the projectile already passed through
+            Vector2 bottomCenter = new Vector2(Projectile.Center.X, Projectile.Bottom.Y);
+            Point tilePos = bottomCenter.ToTileCoordinates();
+
+            // Scan upward first in case the bottom edge overshot into a tile
+            // This recovers the true top surface even if we're a pixel or two deep
+            while (tilePos.Y > 0)
+            {
+                Tile above = Framing.GetTileSafely(tilePos.X, tilePos.Y - 1);
+                if (!above.HasTile || !Main.tileSolid[above.TileType])
+                    break;
+                tilePos.Y--;
+            }
+
+            int Yoffset = 4; // make it sink in the block alittle
+
+            // tilePos.Y is now the topmost solid tile in the column at this X.
+            // Spawn LingeringRock so its bottom sits flush on the tile surface.
+            // LingeringRock height = 26, tile top = tilePos.Y * 16
+            // So center.Y = (tilePos.Y * 16) - (26 / 2) = tilePos.Y * 16 - 13
+            int lingeringRockHeight = 26;
+            Vector2 spawnPos = new Vector2(
+                tilePos.X * 16 + 8,
+                tilePos.Y * 16 - lingeringRockHeight / 2 + Yoffset
+            );
+
+            Projectile.NewProjectile(
+                Projectile.GetSource_FromThis(),
+                spawnPos,
+                Vector2.Zero,
+                ModContent.ProjectileType<LingeringRock>(),
+                Projectile.damage,
+                0f,
+                Main.myPlayer
+            );
+        }
+
+        Projectile.Kill();
+    }
+}
 
     public class LingeringRock : ModProjectile
     {
@@ -254,5 +266,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             // Optional: pulse or glow effect over time
             Lighting.AddLight(Projectile.Center, 0.8f, 0.3f, 0.1f);
         }
+
     }
 }

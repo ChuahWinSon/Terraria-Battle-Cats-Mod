@@ -46,15 +46,16 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float CloneTimer => ref NPC.ai[3];
         
 
+        public static int DashSpreadDamage => 10;
         
 
         public override void SetDefaults()
         {
             NPC.aiStyle = 0;
 
-            NPC.damage = 50;
+            NPC.damage = 70;
             NPC.defense = 12;
-            NPC.lifeMax = 8000;
+            NPC.lifeMax = 6000;
             NPC.HitSound = SoundID.NPCHit1;
             NPC.DeathSound = SoundID.NPCDeath1;
             NPC.knockBackResist = 0f;
@@ -507,7 +508,7 @@ TriggerRoar(50);
         AITimer = 0f;
         dashCount = 0;
         NPC.velocity = Vector2.Zero;
-        AIState = (float)ActionState.Reset; // ← add this
+        AIState = (float)ActionState.LingeringRocks; // ← add this
         NPC.netUpdate = true;               // ← and this
     }
 }
@@ -519,7 +520,6 @@ private void ShootSpreadProjectiles(Player target)
         // Optional: spawn a telegraph dust/particle burst here
     }
 
-    int projDamage  = 40;
     float projSpeed = 14f;
     int spreadCount = 5;
     float spreadAngle = MathHelper.ToRadians(45f); // total arc in degrees
@@ -542,7 +542,7 @@ private void ShootSpreadProjectiles(Player target)
                 NPC.Center,
                 velocity,
                 ModContent.ProjectileType<CycloneProjectile>(),
-                projDamage,
+                DashSpreadDamage,
                 2f,        // knockback
                 Main.myPlayer,
                 ai0: Main.rand.Next(4)
@@ -605,7 +605,7 @@ private void ShootSpreadProjectiles(Player target)
             if (AITimer >= 210f)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.TripleDashAttack;
+                AIState = (float)ActionState.Reset;
             }
 
 
@@ -640,7 +640,7 @@ private void ShootSpreadProjectiles(Player target)
                     spawnPos,
                     velocity,
                     ModContent.ProjectileType<ClusteredRock>(),
-                    NPC.damage / 4,
+                    10,
                     2f,
                     Main.myPlayer
                 );
@@ -779,7 +779,7 @@ private void DoBehavior_CircleAndShoot()
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-                int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+                int damage       = 10;
 
                 Projectile.NewProjectile(
                     NPC.GetSource_FromAI(),
@@ -923,7 +923,7 @@ private void FireWallVolley(Player player)
 
     int   bulletCount = 5;
     float speed       = 4f;
-    int   damage      = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+    int   damage      = 10;
     float direction   = NPC.Center.X < player.Center.X ? 1f : -1f;
 
     for (int i = 0; i < bulletCount; i++)
@@ -1038,7 +1038,7 @@ private void DoBehavior_FallingRocks()
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-                int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+                int damage       = 10;
                 Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4)); 
                 
             }
@@ -1095,7 +1095,7 @@ private void SpawnLaserProjectiles(Player player)
     int lineCount   = 16;
     int lineSpacing = 8 * 16;
     int projSpeed   = 12;
-    int projDamage  = 20;
+    int projDamage  = 10;
 
     for (int i = 0; i < lineCount; i++)
     {
@@ -1679,7 +1679,7 @@ public class CycloneClone : ModNPC
     {
         NPC.width         = 110;
         NPC.height        = 110;
-        NPC.damage        = 30;
+        NPC.damage        = 1;
         NPC.defense       = 0;
         NPC.lifeMax       = 1;
         NPC.noGravity     = true;
@@ -1881,7 +1881,7 @@ private void DoAttack2()
             SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
             Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-            int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+            int damage       = 10;
 
 
             Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 12f,
@@ -1978,7 +1978,7 @@ private void DoAttack3()
                         new Vector2(NPC.Center.X, spawnY),
                         new Vector2(shootDirX, 0f),
                         ModContent.ProjectileType<CycloneProjectile>(),
-                        NPC.GetAttackDamage_ForProjectiles(30f, 20f),
+                        10,
                         2f,
                         Main.myPlayer,
                         ai0: Main.rand.Next(4),
@@ -2037,7 +2037,7 @@ private void DoAttack4()
         SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
         Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-        int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
+        int damage       = 10;
         Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,
         ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
