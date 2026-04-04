@@ -52,7 +52,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             NPC.aiStyle = 0;
 
-            NPC.damage = 70;
+            NPC.damage = 40;
             NPC.defense = 12;
             NPC.lifeMax = 6000;
             NPC.HitSound = SoundID.NPCHit1;
@@ -307,10 +307,85 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         }
 
         
+        private Vector2 DashDirection;
 
         private void DoBehavior_DisappearingDash() //Final turn!! Stand up, my Vanguard!!
         {
+            Player player = Main.player[NPC.target];
+            AITimer++;
+
+            // Phase 1: Boss disappears (fade out)
+            if (AITimer <= 30f)
+            {
+                NPC.alpha = (int)MathHelper.Lerp(0, 255, AITimer / 30f); // fade OUT
+                NPC.velocity = Vector2.Zero;
+
+                // Force the boss to face the direction it is actually moving (idk why ts glitched)
+                NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
+                return;
+            }
+
+            // Phase 2: At frame 31, spawn telegraph + teleport boss to radius point
+            if (AITimer == 31f && Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                float angle  = Main.rand.NextFloat(0, MathHelper.TwoPi);
+                float radius = 400f;
+
+                Vector2 targetPos = player.Center + radius * new Vector2(
+                    (float)Math.Cos(angle),
+                    (float)Math.Sin(angle)
+                );
+
+                CreateTeleportTelegraph(targetPos);
+
+                NPC.Center    = targetPos;
+                NPC.netUpdate = true;
+            }
+
+            // Phase 3: Wait at the teleport point (still invisible), lock dash direction
+            if (AITimer <= 60f)
+            {
+                NPC.velocity = Vector2.Zero;
+                NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+                NPC.spriteDirection = NPC.direction;
+
+                // Lock in dash direction once near the launch frame
+                if (AITimer == 55f)
+                {
+                    DashDirection = Vector2.Normalize(player.Center - NPC.Center);
+                    SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+                }
+                return;
+            }
+
+
+            NPC.velocity = DashDirection * 30f;
+
+            // Force the boss to face the direction it is actually moving (idk why ts glitched)
+            NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
             
+            if (AITimer > 60)
+            {
+                NPC.velocity *= 0.90f; // friction; tweak for feel
+            }
+
+            // Fade boss back in during dash
+            NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 60) / 30f, 1f));
+
+            if (AITimer > 90)
+            {
+                NPC.velocity = Vector2.Zero;
+            }
+
+            // End attack after dash completes
+            if (AITimer >= 120)
+            {
+                AITimer = 0;
+                DashDirection  = Vector2.Zero;
+                AIState = (float)ActionState.FinalTurn;
+                NPC.alpha      = 0; // fully visible again
+                // transition to next AI state here
+            }
         }
 
         
@@ -414,7 +489,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         }
 
 
-private int dashCount = 0;
+
 private Vector2 dashTarget;
 
 private void DoBehavior_TripleDashAttack()
@@ -437,7 +512,7 @@ private void DoBehavior_TripleDashAttack()
         if (dist <= 180f && AITimer <= -180 || AITimer < -360) // at least 180 frames and close or already been 600 frames
         {
             NPC.velocity = Vector2.Zero;
-            dashCount = 0;
+
             AITimer = 1f; // kick into phase 2
         }
         else
@@ -458,7 +533,6 @@ private void DoBehavior_TripleDashAttack()
     // --- Dash 1: DOWN ---
     if (localFrame == 1) // windup done, launch
     {
-        dashCount = 1;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
         NPC.velocity = direction * 24f;
 
@@ -469,7 +543,6 @@ TriggerRoar(30);
     // --- Dash 2: UP (back above player) ---
     if (localFrame == 45)
     {
-        dashCount = 2;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
         NPC.velocity = direction * 24f;
 
@@ -489,13 +562,12 @@ TriggerRoar(50);
 
     if (localFrame == 106)
     {
-        dashCount = 3;
         Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player again
         NPC.velocity = direction * 24f;
     }
 
     // --- Decelerate after each dash launch ---
-    if (dashCount > 0)
+    if (localFrame > 0)
     {
         NPC.velocity *= 0.98f; // friction; tweak for feel
     }
@@ -504,7 +576,6 @@ TriggerRoar(50);
     if (localFrame >= 166)
     {
         AITimer = 0f;
-        dashCount = 0;
         NPC.velocity = Vector2.Zero;
         AIState = (float)ActionState.LingeringRocks; // ← add this
         NPC.netUpdate = true;               // ← and this

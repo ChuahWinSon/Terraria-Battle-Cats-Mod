@@ -214,6 +214,9 @@ Projectiles: {
 	CycloneTelegraph.DisplayName: Cyclone Telegraph
 	TelegraphLines.DisplayName: Telegraph Lines
 	ExampleAdvancedFlailProjectile.DisplayName: Example Advanced Flail Projectile
+	ClusteredRock.DisplayName: Clustered Rock
+	LingeringRock.DisplayName: Lingering Rock
+	MiniCyclone.DisplayName: Mini Cyclone
 }
 
 Dialogue: {
