@@ -224,6 +224,9 @@ public class ClusteredRock : ModProjectile
             // Spawn LingeringRock so its bottom sits flush on the tile surface.
             // LingeringRock height = 26, tile top = tilePos.Y * 16
             // So center.Y = (tilePos.Y * 16) - (26 / 2) = tilePos.Y * 16 - 13
+
+
+
             int lingeringRockHeight = 26;
             Vector2 spawnPos = new Vector2(
                 tilePos.X * 16 + 8,
@@ -239,6 +242,20 @@ public class ClusteredRock : ModProjectile
                 0f,
                 Main.myPlayer
             );
+
+            // Impact dust burst
+            for (int i = 0; i < 18; i++)
+            {
+                Dust d = Dust.NewDustDirect(
+                    spawnPos - new Vector2(16, 16),
+                    32, 32,
+                    DustID.Stone
+                );
+                d.velocity = Main.rand.NextVector2Circular(5f, 5f);
+                d.velocity.Y -= Main.rand.NextFloat(1f, 4f); // bias upward
+                d.scale = Main.rand.NextFloat(1f, 1.8f);
+                d.noGravity = false;
+            }
         }
 
         Projectile.Kill();
@@ -268,4 +285,36 @@ public class ClusteredRock : ModProjectile
         }
 
     }
+
+    // public class MiniCyclone : ModProjectile
+    // {
+
+    //     public override void SetStaticDefaults()
+    //     {
+    //         Main.projFrames[Projectile.type] = 5; 
+    //     }
+    //     public override void SetDefaults()
+    //     {
+    //         Projectile.width = 80;
+    //         Projectile.height = 80;
+    //         Projectile.hostile = true;
+    //         Projectile.friendly = false;
+    //         Projectile.tileCollide = false;
+    //         Projectile.ignoreWater = true;
+    //         Projectile.timeLeft = 600;
+    //         Projectile.penetrate = -1;
+    //     }
+
+    //     public override void AI()
+    //     {
+
+    //         // animate — advances frame every 5 ticks (12fps at 60fps)
+    //         if (++Projectile.frameCounter >= 5)
+    //         {
+    //             Projectile.frameCounter = 0;
+    //             Projectile.frame = (Projectile.frame + 1) % 5;
+    //         }
+    //     }
+
+    // }
 }
