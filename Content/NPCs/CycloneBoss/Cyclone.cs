@@ -36,6 +36,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             MiniCyclones,
             EnhancedAttack1,
             EnhancedAttack4,
+            GroundSmash,
+
             FinalTurn
         }
 
@@ -296,6 +298,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.EnhancedAttack4:
                     EnhancedAttack4();
                     break;
+                case (float)ActionState.GroundSmash:
+                    DoBehavior_GroundSmash();
+                    break;
                 case (float)ActionState.FinalTurn:
                     DoBehavior_DisappearingDash();
                     break;
@@ -328,7 +333,139 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         }
 
-        
+        private bool _groundSmashHit = false;
+
+private void DoBehavior_GroundSmash()
+{
+    Player player = Main.player[NPC.target];
+
+
+    // ── Phase 1: reposition above player (negative timer ramp-up, same pattern as TripleDash) ──
+    if (AITimer <= 0)
+    {
+        Vector2 targetPos   = player.Center + new Vector2(0f, -280f);
+        Vector2 toTarget    = targetPos - NPC.Center;
+        float   dist        = toTarget.Length();
+        float   rampFrames  = -AITimer;
+        float   maxSpeed    = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
+        Vector2 ideal       = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
+        NPC.velocity        = Vector2.Lerp(NPC.velocity, ideal, 0.07f);
+        NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+
+        bool closeEnough = dist <= 200f && AITimer <= -120;
+        bool tookTooLong = AITimer < -300;
+        if (closeEnough || tookTooLong)
+        {
+            NPC.velocity = Vector2.Zero;
+            AITimer = 1f;   // kick to wind-up
+        }
+        else
+        {
+            AITimer--;
+        }
+        return;
+    }
+
+    AITimer++;
+
+    // ── Phase 2: wind-up (frames 1-40) ──
+    if (AITimer <= 40f)
+    {
+        NPC.velocity        = Vector2.Zero;
+        NPC.spriteDirection = NPC.Center.X < player.Center.X ? 1 : -1;
+
+        if (AITimer == 10f)
+        {
+            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+            TriggerRoar(40);
+            if (Main.netMode != NetmodeID.Server)
+                BossCameraSystem.TriggerShake(6f);
+        }
+        return;
+    }
+
+    // ── Phase 3: dash downward & tile-check every frame ──
+    if (!_groundSmashHit)
+    {
+        NPC.velocity = new Vector2(0f, 30f);
+
+        // Check the tile directly under the boss centre
+        int tileX = (int)((NPC.Center.X) / 16f);
+        int tileY = (int)((NPC.Bottom.Y) / 16f);      // bottom edge
+        int tileYSafeGuard = ((int)((NPC.Bottom.Y) / 16f)) - 1 ;      // prevent phase through blocks
+
+        bool hitTile = WorldGen.SolidTile(tileX, tileY) || WorldGen.SolidTile(tileX, tileYSafeGuard);
+        bool timedOut = AITimer >= 160f;
+
+        if (hitTile || timedOut)
+        {
+            _groundSmashHit = true;
+            NPC.velocity    = Vector2.Zero;
+
+            if (Main.netMode != NetmodeID.Server)
+                BossCameraSystem.TriggerShake(14f);
+
+            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+
+            // ── Rock spawn: check ±25, ±50, ±75 tile offsets ──
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                int[] offsets = { -75, -50, -25, 25, 50, 75 };
+
+                foreach (int tileOffsetX in offsets)
+                {
+                    int checkX = tileX + tileOffsetX;
+
+                    // Walk down from the boss Y to find the surface at this X
+                    int surfaceY = tileY;
+                    for (int scanY = tileY; scanY < tileY + 40; scanY++)
+                    {
+                        if (WorldGen.SolidTile(checkX, scanY))
+                        {
+                            surfaceY = scanY;
+                            break;
+                        }
+                    }
+
+                    if (WorldGen.SolidTile(checkX, surfaceY))
+                    {
+                        // Spawn rock just above the solid tile
+                        Vector2 rockPos = new Vector2(
+                            checkX * 16f + 8f,
+                            surfaceY * 16f - 8f
+                        );
+
+                        // Velocity: arc upward, slight outward spread from centre
+                        float horizontalDir   = tileOffsetX > 0 ? 1f : -1f;
+                        float horizontalSpeed = Math.Abs(tileOffsetX) / 25f * 2.5f; // further = more spread
+                        Vector2 rockVel       = new Vector2(horizontalDir * horizontalSpeed, -8f);
+
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            rockPos,
+                            rockVel,
+                            ModContent.ProjectileType<ClusteredRock>(),
+                            10,
+                            2f,
+                            Main.myPlayer
+                        );
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // ── Phase 4: brief pause after impact, then reset ──
+    if (AITimer >= 220f)
+    {
+        _groundSmashHit = false;
+        AITimer         = 0f;
+        AIState         = (float)ActionState.TripleDashAttack;
+        NPC.netUpdate   = true;
+    }
+}
+
         private Vector2 DashDirection;
 
         private void DoBehavior_DisappearingDash() //Final turn!! Stand up, my Vanguard!!
@@ -474,42 +611,43 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             OrbitAngle = 0f;
             LaunchDirection = Vector2.Zero;
             LaunchTimer = 0f;
+            AITimer = 0f;
 
             
             NPC.TargetClosest(false);
             NPC.velocity *= 0.95f;
 
-            ActionState nextAttack;
-            do
-            {
-                if (LifeRatio < FinalPhaseLifeRatio)
-                {
-                    nextAttack = ActionState.FinalTurn;
-                }
-                else if (LifeRatio > 0.5f)
-                {
-                    nextAttack = Main.rand.Next(2) switch
-                    {
-                        0 => ActionState.CircleAndShoot,
-                        _ => ActionState.SansWall,
-                    };
-                }
-                else
-                {
-                    nextAttack = Main.rand.Next(4) switch
-                    {
-                        0 => ActionState.CircleAndShoot,
-                        1 => ActionState.SansWall,
-                        2 => ActionState.LingeringRocks,
-                        _ => ActionState.MiniCyclones,
-                    };  
-                }
-            }
+            // ActionState nextAttack;
+            // do
+            // {
+            //     if (LifeRatio < FinalPhaseLifeRatio)
+            //     {
+            //         nextAttack = ActionState.FinalTurn;
+            //     }
+            //     else if (LifeRatio > 0.5f)
+            //     {
+            //         nextAttack = Main.rand.Next(2) switch
+            //         {
+            //             0 => ActionState.CircleAndShoot,
+            //             _ => ActionState.SansWall,
+            //         };
+            //     }
+            //     else
+            //     {
+            //         nextAttack = Main.rand.Next(4) switch
+            //         {
+            //             0 => ActionState.CircleAndShoot,
+            //             1 => ActionState.SansWall,
+            //             2 => ActionState.LingeringRocks,
+            //             _ => ActionState.MiniCyclones,
+            //         };  
+            //     }
+            // }
 
-            while (nextAttack == previousAttack); // never repeat the same attack twice
+            // while (nextAttack == previousAttack); // never repeat the same attack twice
 
 
-            // ActionState nextAttack = ActionState.MiniCyclones; //testing
+            ActionState nextAttack = ActionState.GroundSmash; //testing
 
 
             previousAttack = nextAttack;
@@ -551,6 +689,7 @@ private void DoBehavior_TripleDashAttack()
 
         return;
     }
+
 
     // Phase 2
     AITimer++;
