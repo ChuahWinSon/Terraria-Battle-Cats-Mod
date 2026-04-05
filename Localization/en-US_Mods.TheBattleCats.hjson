@@ -217,6 +217,7 @@ Projectiles: {
 	ClusteredRock.DisplayName: Clustered Rock
 	LingeringRock.DisplayName: Lingering Rock
 	MiniCyclone.DisplayName: Mini Cyclone
+	SplittingRock.DisplayName: Splitting Rock
 }
 
 Dialogue: {

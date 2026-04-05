@@ -33,7 +33,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             SansWall,
             FallingRocks,
             LingeringRocks,
-            // MiniCyclones,
+            MiniCyclones,
             EnhancedAttack1,
             EnhancedAttack4,
             FinalTurn
@@ -69,6 +69,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private const int CloneOffset = 100; // pixels left/right, tune this
         private const int CloneAlpha  = 200; // transparency, tune this
 
+        public const float FinalPhaseLifeRatio = 0.1f;
 
 
         private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
@@ -286,9 +287,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.LingeringRocks:
                     DoBehavior_LingeringRocks();
                     break;
-                // case (float)ActionState.MiniCyclones:
-                //     DoBehavior_SpawnMiniCyclones(player);
-                //     break;
+                case (float)ActionState.MiniCyclones:
+                    DoBehavior_SpawnMiniCyclones(player);
+                    break;
                 case (float)ActionState.EnhancedAttack1:
                     EnhancedAttack1();
                     break;
@@ -303,6 +304,27 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             }
 
 
+            //spliting rocks
+            if (LifeRatio < 0.5 && AITimer % 100 == 99)
+            {
+                Vector2 velocity = new Vector2(0f, 5f) ;
+
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        NPC.Center,                          // position (boss center)
+                        velocity,                        // velocity (adjust as needed)
+                        ModContent.ProjectileType<SplittingRock>(),
+                        10,                              // your damage value
+                        2f,                           // your knockback value
+                        Main.myPlayer
+                    );
+                }
+
+            }
+
+
 
         }
 
@@ -313,6 +335,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Player player = Main.player[NPC.target];
             AITimer++;
+
 
             // Phase 1: Boss disappears (fade out)
             if (AITimer <= 30f)
@@ -340,6 +363,11 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
                 NPC.Center    = targetPos;
                 NPC.netUpdate = true;
+            }
+
+            if (AITimer == 59)
+            {
+                ShootSpreadProjectiles(Main.player[NPC.target]);
             }
 
             // Phase 3: Wait at the teleport point (still invisible), lock dash direction
@@ -451,35 +479,37 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             NPC.TargetClosest(false);
             NPC.velocity *= 0.95f;
 
-            // ActionState nextAttack;
-            // do
-            // {
-            //     if (LifeRatio > 0.62f)
-            //     {
-            //         nextAttack = Main.rand.Next(4) switch
-            //         {
-            //             0 => ActionState.Dash,
-            //             1 => ActionState.CircleAndShoot,
-            //             2 => ActionState.SansWall,
-            //             _ => ActionState.FallingRocks,
-            //         };
-            //     }
-            //     else
-            //     {
-            //         nextAttack = Main.rand.Next(4) switch
-            //         {
-            //             0 => ActionState.EnhancedAttack1,
-            //             1 => ActionState.EnhancedAttack2,
-            //             2 => ActionState.EnhancedAttack3,
-            //             _ => ActionState.EnhancedAttack4,
-            //         };  
-            //     }
-            // }
+            ActionState nextAttack;
+            do
+            {
+                if (LifeRatio < FinalPhaseLifeRatio)
+                {
+                    nextAttack = ActionState.FinalTurn;
+                }
+                else if (LifeRatio > 0.5f)
+                {
+                    nextAttack = Main.rand.Next(2) switch
+                    {
+                        0 => ActionState.CircleAndShoot,
+                        _ => ActionState.SansWall,
+                    };
+                }
+                else
+                {
+                    nextAttack = Main.rand.Next(4) switch
+                    {
+                        0 => ActionState.CircleAndShoot,
+                        1 => ActionState.SansWall,
+                        2 => ActionState.LingeringRocks,
+                        _ => ActionState.MiniCyclones,
+                    };  
+                }
+            }
 
-            // while (nextAttack == previousAttack); // never repeat the same attack twice
+            while (nextAttack == previousAttack); // never repeat the same attack twice
 
 
-            ActionState nextAttack = ActionState.FinalTurn; //testing
+            // ActionState nextAttack = ActionState.MiniCyclones; //testing
 
 
             previousAttack = nextAttack;
@@ -490,7 +520,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
 
 
-private Vector2 dashTarget;
 
 private void DoBehavior_TripleDashAttack()
 {
@@ -504,12 +533,12 @@ private void DoBehavior_TripleDashAttack()
         float dist = toTarget.Length();
 
         float rampFrames = -AITimer; // AITimer is negative, so this gives a positive frame count
-        float maxSpeed = MathHelper.Clamp(rampFrames * 0.1f, 1f, 40f);
+        float maxSpeed = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
         Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
         NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
         NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
 
-        if (dist <= 180f && AITimer <= -180 || AITimer < -360) // at least 180 frames and close or already been 600 frames
+        if (dist <= 240f && AITimer <= -120 || AITimer < -240) // at least 180 frames and close or already been 600 frames
         {
             NPC.velocity = Vector2.Zero;
 
@@ -687,6 +716,7 @@ private void ShootSpreadProjectiles(Player target)
 
             int rockCount = 5;
             float spreadWidth = 200f; // total horizontal spread
+
 
             for (int i = 0; i < rockCount; i++)
             {
@@ -1446,54 +1476,55 @@ private void EnhancedAttack4()
         }
     }
 
-// private void DoBehavior_SpawnMiniCyclones(Player target)
-// {
+private void DoBehavior_SpawnMiniCyclones(Player target)
+{
     
+    AITimer++;
 
-//     if (AITimer == 0)
-//     {
-//         if (Main.netMode != NetmodeID.MultiplayerClient)
-//         {
-//             for (float offset = -750f; offset < 750f; offset += 150f)
-//             {
-//                 Vector2 spawnPosition = target.Center + new Vector2(offset, -750f);
-//                 Vector2 pearlShootVelocity = Vector2.UnitY * 8f;
-//                 Projectile.NewProjectile(
-//                 NPC.GetSource_FromAI(),  
-//                 spawnPosition,
-//                 pearlShootVelocity,
-//                 ModContent.ProjectileType<MiniCyclone>(),
-//                 10,
-//                 0f,
-//                 Main.myPlayer
-//                 );
-//             }
-//             for (float offset = -675f; offset < 825f; offset += 150f)
-//             {
-//                 Vector2 spawnPosition = target.Center + new Vector2(offset, 750f);  
-//                 Vector2 pearlShootVelocity = Vector2.UnitY * -8f;
-//                 Projectile.NewProjectile(
-//                 NPC.GetSource_FromAI(),  
-//                 spawnPosition,
-//                 pearlShootVelocity,
-//                 ModContent.ProjectileType<MiniCyclone>(),
-//                 10,
-//                 0f,
-//                 Main.myPlayer
-//                 );
-//             }
-//             NPC.netUpdate = true;
-//         }
-//     }
+    if (AITimer == 30)
+    {
+        if (Main.netMode != NetmodeID.MultiplayerClient)
+        {
+            for (float offset = -750f; offset < 750f; offset += 150f)
+            {
+                Vector2 spawnPosition = target.Center + new Vector2(offset, -750f);
+                Vector2 pearlShootVelocity = Vector2.UnitY * 8f;
+                Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),  
+                spawnPosition,
+                pearlShootVelocity,
+                ModContent.ProjectileType<MiniCyclone>(),
+                10,
+                0f,
+                Main.myPlayer
+                );
+            }
+            for (float offset = -675f; offset < 825f; offset += 150f)
+            {
+                Vector2 spawnPosition = target.Center + new Vector2(offset, 750f);  
+                Vector2 pearlShootVelocity = Vector2.UnitY * -8f;
+                Projectile.NewProjectile(
+                NPC.GetSource_FromAI(),  
+                spawnPosition,
+                pearlShootVelocity,
+                ModContent.ProjectileType<MiniCyclone>(),
+                10,
+                0f,
+                Main.myPlayer
+                );
+            }
+            NPC.netUpdate = true;
+        }
+    }
 
-//     AITimer++;
+
     
-//     if (AITimer >= 180)
-//     {
-//         AITimer = 0f;
-//         AIState = (float)ActionState.TripleDashAttack;
-//     }
-// }
+    if (AITimer >= 210)
+    {
+        AITimer = 0f;
+        AIState = (float)ActionState.TripleDashAttack;
+    }
+}
 
     
 
@@ -1791,7 +1822,7 @@ private void DoAttack2()
     // Fade out
     if (AITimer >= 360f && AITimer < 420f)
     {
-        NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 480f) / 60f, 1f));
+        NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 360f) / 60f, 1f));
         NPC.velocity *= 0.9f;
         return;
     }

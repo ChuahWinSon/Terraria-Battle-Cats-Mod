@@ -168,6 +168,7 @@ public class ClusteredRock : ModProjectile
 
     public override void AI()
     {
+
         if (Main.rand.NextBool(5))
         {
             Dust d = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Stone);
@@ -194,6 +195,7 @@ public class ClusteredRock : ModProjectile
 
             if (tile.HasTile && Main.tileSolid[tile.TileType])
             {
+
                 OnHitTile();
             }
         }
@@ -272,7 +274,7 @@ public class ClusteredRock : ModProjectile
             Projectile.friendly = false;
             Projectile.tileCollide = false;
             Projectile.ignoreWater = true;
-            Projectile.timeLeft = 900;
+            Projectile.timeLeft = 2700;
             Projectile.penetrate = -1;
         }
 
@@ -286,35 +288,156 @@ public class ClusteredRock : ModProjectile
 
     }
 
-    // public class MiniCyclone : ModProjectile
-    // {
+    public class SplittingRock : ModProjectile
+    {
+        public override void SetDefaults()
+        {
+            Projectile.width = 32;
+            Projectile.height = 32;
+            Projectile.hostile = true;
+            Projectile.ignoreWater = true;
+            Projectile.tileCollide = false;
+            Projectile.timeLeft = 300; // safety net
+        }
 
-    //     public override void SetStaticDefaults()
-    //     {
-    //         Main.projFrames[Projectile.type] = 5; 
-    //     }
-    //     public override void SetDefaults()
-    //     {
-    //         Projectile.width = 80;
-    //         Projectile.height = 80;
-    //         Projectile.hostile = true;
-    //         Projectile.friendly = false;
-    //         Projectile.tileCollide = false;
-    //         Projectile.ignoreWater = true;
-    //         Projectile.timeLeft = 600;
-    //         Projectile.penetrate = -1;
-    //     }
 
-    //     public override void AI()
-    //     {
+        public override void AI()
+        {
+            Projectile.velocity *= 0.96f;
+            Projectile.ai[0]++;
 
-    //         // animate — advances frame every 5 ticks (12fps at 60fps)
-    //         if (++Projectile.frameCounter >= 5)
-    //         {
-    //             Projectile.frameCounter = 0;
-    //             Projectile.frame = (Projectile.frame + 1) % 5;
-    //         }
-    //     }
+            // --- Glow red effect ---
+            float progress = Projectile.ai[0] / 120f; // 0.0 → 1.0 over 2 seconds
 
-    // }
+            if (Projectile.ai[0] >= 90) // last 30 ticks: flash rapidly
+            {
+                // alternates every 4 ticks between red and dark-red
+                bool flash = (int)(Projectile.ai[0] / 4) % 2 == 0;
+                Projectile.alpha = flash ? 0 : 150;
+            }
+
+            // Emit red dust as it charges up
+            if (Main.rand.NextBool(Math.Max(1, (int)(10 * (1f - progress)))))
+            {
+                Dust dust = Dust.NewDustDirect(
+                    Projectile.position, Projectile.width, Projectile.height,
+                    DustID.Torch, // orange-red fire dust
+                    0f, 0f,
+                    100,
+                    Color.Red,
+                    1.5f * progress // grows bigger as it charges
+                );
+                dust.noGravity = true;
+                dust.velocity *= 0.5f;
+            }
+
+            if (Projectile.ai[0] >= 120)
+            {
+                Explode();
+                Projectile.Kill();
+            }
+        }
+
+        // Tint the sprite red, getting more intense over time
+        public override Color? GetAlpha(Color lightColor)
+        {
+            float progress = Math.Min(Projectile.ai[0] / 120f, 1f);
+
+            // Lerp from normal color → full red
+            Color tint = Color.Lerp(lightColor, Color.Red, progress);
+            tint.A = (byte)(255 - Projectile.alpha);
+            return tint;
+        }
+
+        private void Explode()
+        {
+            if (Main.netMode == NetmodeID.MultiplayerClient)
+                return;
+
+            int numProjectiles = 5;
+            float speed = 8f;
+
+            for (int i = 0; i < numProjectiles; i++)
+            {
+                // evenly spread 5 directions in a full circle
+                float angle = MathHelper.TwoPi / numProjectiles * i;
+                Vector2 velocity = new Vector2(speed, 0f).RotatedBy(angle);
+
+                Projectile.NewProjectile(
+                    Projectile.GetSource_FromAI(),
+                    Projectile.Center,
+                    velocity,
+                    ModContent.ProjectileType<CycloneProjectile>(),
+                    Projectile.damage,
+                    Projectile.knockBack,
+                    Main.myPlayer
+                );
+            }
+        }
+    }
+
+    public class MiniCyclone : ModProjectile
+    {
+
+        public override void SetStaticDefaults()
+        {
+            Main.projFrames[Projectile.type] = 5; 
+            Main.projFrames[Type] = 5;
+            ProjectileID.Sets.TrailingMode[Projectile.type] = 0;
+            ProjectileID.Sets.TrailCacheLength[Projectile.type] = 7;
+        }
+        public override void SetDefaults()
+        {
+            Projectile.width = 50;
+            Projectile.height = 50;
+            Projectile.hostile = true;
+            Projectile.friendly = false;
+            Projectile.tileCollide = false;
+            Projectile.ignoreWater = true;
+            Projectile.timeLeft = 600;
+            Projectile.penetrate = -1;
+        }
+
+        public override void AI()
+        {
+
+            Projectile.rotation = Projectile.velocity.ToRotation();
+
+            // animate — advances frame every 5 ticks (12fps at 60fps)
+            if (++Projectile.frameCounter >= 5)
+            {
+                Projectile.frameCounter = 0;
+                Projectile.frame = (Projectile.frame + 1) % 5;
+            }
+        }
+
+       public override bool PreDraw(ref Color lightColor)
+        {
+            Texture2D texture = ModContent.Request<Texture2D>(Texture).Value;
+
+            int frameHeight = texture.Height / Main.projFrames[Projectile.type];
+            Rectangle sourceRect = new Rectangle(0, Projectile.frame * frameHeight, texture.Width, frameHeight);
+            Vector2 origin = new Vector2(texture.Width / 2f, frameHeight / 2f);
+
+            Color drawColor = Color.White;
+            drawColor.A = 0; // keeps additive blending working correctly
+            drawColor *= 0.5f;
+
+            for (int i = 0; i < Projectile.oldPos.Length; i++)
+            {
+                Vector2 drawPos = Projectile.oldPos[i] - Main.screenPosition 
+                    + new Vector2(Projectile.width / 2f, Projectile.height / 2f);
+
+                float trailOpacity = (1f - (float)i / Projectile.oldPos.Length) * 0.5f;
+
+                Main.EntitySpriteDraw(
+                    texture, drawPos, sourceRect, drawColor * trailOpacity,
+                    Projectile.rotation, origin, Projectile.scale,
+                    SpriteEffects.None, 0);
+            }
+
+            return true;
+        }
+
+    }
 }
