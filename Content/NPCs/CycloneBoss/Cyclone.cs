@@ -44,7 +44,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float AIState => ref NPC.ai[0];
         public ref float AITimer => ref NPC.ai[1];
         public ref float AttackTimer => ref NPC.ai[2];
-        public ref float CloneTimer => ref NPC.ai[3];
+        public ref float ExtraTimer => ref NPC.ai[3];
         
 
         public static int DashSpreadDamage => 10;
@@ -74,17 +74,22 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public const float FinalPhaseLifeRatio = 0.1f;
 
 
-        private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
+        private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneProjectile")
         {
             PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
         };
 
-        private static readonly SoundStyle CycloneRoarGor = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarGor")
+        private static readonly SoundStyle CycloneRoarGor = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneRoarGor")
         {
             PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
         };
 
-        private static readonly SoundStyle CycloneRoarDrag = new SoundStyle("TheBattleCats/Assets/Effects/CycloneRoarDrag")
+        private static readonly SoundStyle CycloneRoarDrag = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneRoarDrag")
+        {
+            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
+        };
+
+        private static readonly SoundStyle CycloneSlam = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneSlam")
         {
             PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
         };
@@ -329,6 +334,23 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
             }
 
+            //spliting rocks
+            if (LifeRatio < 0.7 && AITimer % 150 == 149)
+            {
+                Vector2 velocity = new Vector2(0f, 5f) ;
+
+                Projectile.NewProjectile(
+                    NPC.GetSource_FromAI(),
+                    NPC.Center,
+                    velocity,
+                    ModContent.ProjectileType<ClusteredRock>(),
+                    10,
+                    2f,
+                    Main.myPlayer
+                );
+
+            }
+
 
 
         }
@@ -405,7 +427,7 @@ private void DoBehavior_GroundSmash()
             if (Main.netMode != NetmodeID.Server)
                 BossCameraSystem.TriggerShake(14f);
 
-            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+            SoundEngine.PlaySound(CycloneSlam, NPC.Center);
 
             // ── Rock spawn: check ±25, ±50, ±75 tile offsets ──
             if (Main.netMode != NetmodeID.MultiplayerClient)
@@ -457,12 +479,28 @@ private void DoBehavior_GroundSmash()
     }
 
     // ── Phase 4: brief pause after impact, then reset ──
-    if (AITimer >= 220f)
+
+    // if (AITimer >= 120f)
+    // {
+    //     _groundSmashHit = false;
+    //     AITimer = 0f;
+
+    //     ExtraTimer++;
+    //     if (ExtraTimer >= 3)
+    //     {
+    //         ExtraTimer = 0;
+    //         AIState = (float)ActionState.Reset;
+    //     }
+
+    //     NPC.netUpdate = true;
+    // }
+
+    if (AITimer >= 120f)
     {
         _groundSmashHit = false;
-        AITimer         = 0f;
-        AIState         = (float)ActionState.TripleDashAttack;
-        NPC.netUpdate   = true;
+        AITimer = 0f;
+        AIState = (float)ActionState.Reset;
+        NPC.netUpdate = true;
     }
 }
 
@@ -611,49 +649,67 @@ private void DoBehavior_GroundSmash()
             OrbitAngle = 0f;
             LaunchDirection = Vector2.Zero;
             LaunchTimer = 0f;
+            AttackTimer = 0f;
             AITimer = 0f;
+            ExtraTimer = 0f;
 
             
             NPC.TargetClosest(false);
             NPC.velocity *= 0.95f;
 
-            // ActionState nextAttack;
-            // do
-            // {
-            //     if (LifeRatio < FinalPhaseLifeRatio)
-            //     {
-            //         nextAttack = ActionState.FinalTurn;
-            //     }
-            //     else if (LifeRatio > 0.5f)
-            //     {
-            //         nextAttack = Main.rand.Next(2) switch
-            //         {
-            //             0 => ActionState.CircleAndShoot,
-            //             _ => ActionState.SansWall,
-            //         };
-            //     }
-            //     else
-            //     {
-            //         nextAttack = Main.rand.Next(4) switch
-            //         {
-            //             0 => ActionState.CircleAndShoot,
-            //             1 => ActionState.SansWall,
-            //             2 => ActionState.LingeringRocks,
-            //             _ => ActionState.MiniCyclones,
-            //         };  
-            //     }
-            // }
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {   
+                ActionState nextAttack;
+                do
+                {
+                    if (LifeRatio < FinalPhaseLifeRatio)
+                    {
+                        nextAttack = ActionState.FinalTurn;
+                    }
+                    else if (LifeRatio > 0.7f)
+                    {
+                        nextAttack = Main.rand.Next(4) switch
+                        {
+                            0 => ActionState.CircleAndShoot,
+                            1 => ActionState.TripleDashAttack,
+                            2 => ActionState.LingeringRocks,
+                            _ => ActionState.SansWall,
+                        };
+                    }
+                    else if (LifeRatio > 0.4)
+                    {
+                        nextAttack = Main.rand.Next(5) switch
+                        {
+                            0 => ActionState.CircleAndShoot,
+                            1 => ActionState.SansWall,
+                            2 => ActionState.GroundSmash,
+                            3 => ActionState.LingeringRocks,
+                            _ => ActionState.MiniCyclones,
+                        };  
+                    }
+                    else
+                    {
+                        nextAttack = Main.rand.Next(4) switch
+                        {
+                            0 => ActionState.LingeringRocks,
+                            1 => ActionState.SansWall,
+                            2 => ActionState.GroundSmash,
+                            _ => ActionState.MiniCyclones,
+                        };  
+                    }
+                }
 
-            // while (nextAttack == previousAttack); // never repeat the same attack twice
+                while (nextAttack == previousAttack); // never repeat the same attack twice
 
 
-            ActionState nextAttack = ActionState.GroundSmash; //testing
+                // ActionState nextAttack = ActionState.GroundSmash; //testing
 
 
-            previousAttack = nextAttack;
-            AIState = (float)nextAttack;
-            AITimer = 0f;
-            NPC.netUpdate = true;
+                previousAttack = nextAttack;
+                AIState = (float)nextAttack;
+                AITimer = 0f;
+                NPC.netUpdate = true;
+            }
         }
 
 
@@ -745,7 +801,7 @@ TriggerRoar(50);
     {
         AITimer = 0f;
         NPC.velocity = Vector2.Zero;
-        AIState = (float)ActionState.LingeringRocks; // ← add this
+        AIState = (float)ActionState.Reset; // ← add this
         NPC.netUpdate = true;               // ← and this
     }
 }
@@ -948,7 +1004,7 @@ private void ShootSpreadProjectiles(Player target)
                 AITimer = 0f;
                 OrbitAngle = 0f;
                 LaunchDirection = Vector2.Zero;
-                AIState = (float)ActionState.TripleDashAttack;
+                AIState = (float)ActionState.Reset;
 
             }
         }
@@ -980,7 +1036,7 @@ private void DoBehavior_CircleAndShoot()
         return;
     }
 
-    if (AITimer == 61f && LifeRatio < 0.5f)
+    if (AITimer == 61f && LifeRatio < 0.7f)
     {
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
@@ -1046,7 +1102,7 @@ private void DoBehavior_CircleAndShoot()
         AttackTimer = 0;
 
 
-        AIState    = (float)ActionState.TripleDashAttack;
+        AIState    = (float)ActionState.Reset;
 
         NPC.netUpdate = true;
     }
@@ -1081,7 +1137,7 @@ private void DoBehavior_SansWall()
     return;
 }
 
-    if (AITimer == 61f && LifeRatio < 0.5f)
+    if (AITimer == 61f && LifeRatio < 0.7f)
     {
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
@@ -1130,7 +1186,7 @@ private void DoBehavior_SansWall()
         NPC.alpha  = 0;
         AttackTimer = 0;
         AITimer    = 0f;
-        AIState = (float)ActionState.TripleDashAttack;
+        AIState = (float)ActionState.Reset;
 
     }
 }
@@ -1298,7 +1354,7 @@ private void DoBehavior_FallingRocks()
                 Attack4HoverTimer = 0f;
                 Attack4Angle      = 0f;
                 AITimer           = 0f;
-                AIState = (float)ActionState.TripleDashAttack;
+                AIState = (float)ActionState.Reset;
 
             }
         }
@@ -1387,11 +1443,11 @@ private void EnhancedAttack1()
 
     }
 
-    CloneTimer++;
+    ExtraTimer++;
     
-    if (CloneTimer < 700)
+    if (ExtraTimer < 700)
     {
-        if (CloneTimer % 121 == 61 && Main.netMode != NetmodeID.MultiplayerClient)
+        if (ExtraTimer % 121 == 61 && Main.netMode != NetmodeID.MultiplayerClient)
         {
             float cloneAngle = Main.rand.NextFloat(0, MathHelper.TwoPi);
             float radius = 300f;
@@ -1407,7 +1463,7 @@ private void EnhancedAttack1()
             NPC.netUpdate = true;
         }
 
-        if (CloneTimer % 121 == 91 && CloneTimer > 2 && Main.netMode != NetmodeID.MultiplayerClient)
+        if (ExtraTimer % 121 == 91 && ExtraTimer > 2 && Main.netMode != NetmodeID.MultiplayerClient)
         {
             int cloneIndex = NPC.NewNPC(
                 NPC.GetSource_FromAI(),
@@ -1452,7 +1508,7 @@ private void EnhancedAttack1()
             AttackTimer = 0;
             NPC.alpha                 = 0;
             AITimer                   = 0f;
-            CloneTimer = 0;
+            ExtraTimer = 0;
 
 
             AIState    = (float)ActionState.Reset;
@@ -1572,11 +1628,11 @@ private void EnhancedAttack4()
         }
 
 
-        CloneTimer++;
+        ExtraTimer++;
         
 
         // Spawn next clone 
-        if (CloneTimer % 210f == 200 && CloneTimer < 850 && CloneTimer > 2) //spawn 4 , and prevent insta spawn
+        if (ExtraTimer % 210f == 200 && ExtraTimer < 850 && ExtraTimer > 2) //spawn 4 , and prevent insta spawn
         {
 
             if (Main.netMode != NetmodeID.MultiplayerClient)
@@ -1605,7 +1661,7 @@ private void EnhancedAttack4()
             AttackTimer = 0f;
             AITimer                   = 0f; 
             EnhancedAttack4CloneSequence   = 0;
-            CloneTimer      = 0f;
+            ExtraTimer      = 0f;
 
 
             AIState    = (float)ActionState.Reset;
@@ -1661,7 +1717,7 @@ private void DoBehavior_SpawnMiniCyclones(Player target)
     if (AITimer >= 210)
     {
         AITimer = 0f;
-        AIState = (float)ActionState.TripleDashAttack;
+        AIState = (float)ActionState.Reset;
     }
 }
 
@@ -1737,7 +1793,7 @@ public class CycloneClone : ModNPC
     private const int FadeInDuration = 59;
     private const int TargetAlpha    = 200; // semi transparent, lower = more visible
 
-    private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Effects/CycloneProjectile")
+    private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneProjectile")
     {
         PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
     };
