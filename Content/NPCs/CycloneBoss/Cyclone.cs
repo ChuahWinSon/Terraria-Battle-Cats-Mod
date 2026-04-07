@@ -26,7 +26,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Spawn,
             Reset,
             
-            Idle,
             TripleDashAttack,
             Dash,
             CircleAndShoot,
@@ -272,9 +271,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                     break;
                 case (float)ActionState.Spawn:
                     DoBehavior_SpawnAnimation();
-                    break;
-                case (float)ActionState.Idle:
-                    Idle();
                     break;
                 case (float)ActionState.TripleDashAttack:
                     DoBehavior_TripleDashAttack();
@@ -625,22 +621,7 @@ private void DoBehavior_GroundSmash()
             }
         }
 
-        private void Idle()
-        {
-            // hover in place, transition to Attack1 after a delay
-            AITimer++;
-            NPC.velocity *= 0.95f;
-
-            if (AITimer >= 120f)
-            {
-                AITimer = 0f;
-                AIState = (float)ActionState.SansWall;
-            }
-        }
-
         private ActionState previousAttack = ActionState.Reset;
-
-        
 
         private void DoBehavior_ResetAI()
         {
@@ -689,11 +670,12 @@ private void DoBehavior_GroundSmash()
                     }
                     else
                     {
-                        nextAttack = Main.rand.Next(4) switch
+                        nextAttack = Main.rand.Next(5) switch
                         {
                             0 => ActionState.LingeringRocks,
-                            1 => ActionState.SansWall,
+                            1 => ActionState.TripleDashAttack,
                             2 => ActionState.GroundSmash,
+                            3 => ActionState.CircleAndShoot,
                             _ => ActionState.MiniCyclones,
                         };  
                     }
@@ -1675,8 +1657,9 @@ private void DoBehavior_SpawnMiniCyclones(Player target)
 {
     
     AITimer++;
+    NPC.velocity = Vector2.Zero;
 
-    if (AITimer == 30)
+    if (AITimer == 60)
     {
         if (Main.netMode != NetmodeID.MultiplayerClient)
         {
@@ -1714,7 +1697,7 @@ private void DoBehavior_SpawnMiniCyclones(Player target)
 
 
     
-    if (AITimer >= 210)
+    if (AITimer >= 240)
     {
         AITimer = 0f;
         AIState = (float)ActionState.Reset;
