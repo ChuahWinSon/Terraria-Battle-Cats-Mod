@@ -46,7 +46,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float ExtraTimer => ref NPC.ai[3];
         
 
-        public static int DashSpreadDamage => 10;
+        public static int DashSpreadDamage => 20;
+
+        public static int AllProjectileDamage => 20;
         
 
         public override void SetDefaults()
@@ -322,7 +324,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                         NPC.Center,                          // position (boss center)
                         velocity,                        // velocity (adjust as needed)
                         ModContent.ProjectileType<SplittingRock>(),
-                        10,                              // your damage value
+                        AllProjectileDamage,                              // your damage value
                         2f,                           // your knockback value
                         Main.myPlayer
                     );
@@ -340,7 +342,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                     NPC.Center,
                     velocity,
                     ModContent.ProjectileType<ClusteredRock>(),
-                    10,
+                    AllProjectileDamage,
                     2f,
                     Main.myPlayer
                 );
@@ -349,242 +351,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
 
 
-        }
-
-        private bool _groundSmashHit = false;
-
-private void DoBehavior_GroundSmash()
-{
-    Player player = Main.player[NPC.target];
-
-
-    // ── Phase 1: reposition above player (negative timer ramp-up, same pattern as TripleDash) ──
-    if (AITimer <= 0)
-    {
-        Vector2 targetPos   = player.Center + new Vector2(0f, -280f);
-        Vector2 toTarget    = targetPos - NPC.Center;
-        float   dist        = toTarget.Length();
-        float   rampFrames  = -AITimer;
-        float   maxSpeed    = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
-        Vector2 ideal       = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
-        NPC.velocity        = Vector2.Lerp(NPC.velocity, ideal, 0.07f);
-        NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
-
-        bool closeEnough = dist <= 200f && AITimer <= -120;
-        bool tookTooLong = AITimer < -300;
-        if (closeEnough || tookTooLong)
-        {
-            NPC.velocity = Vector2.Zero;
-            AITimer = 1f;   // kick to wind-up
-        }
-        else
-        {
-            AITimer--;
-        }
-        return;
-    }
-
-    AITimer++;
-
-    // ── Phase 2: wind-up (frames 1-40) ──
-    if (AITimer <= 40f)
-    {
-        NPC.velocity        = Vector2.Zero;
-        NPC.spriteDirection = NPC.Center.X < player.Center.X ? 1 : -1;
-
-        if (AITimer == 10f)
-        {
-            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
-            TriggerRoar(40);
-            if (Main.netMode != NetmodeID.Server)
-                BossCameraSystem.TriggerShake(6f);
-        }
-        return;
-    }
-
-    // ── Phase 3: dash downward & tile-check every frame ──
-    if (!_groundSmashHit)
-    {
-        NPC.velocity = new Vector2(0f, 30f);
-
-        // Check the tile directly under the boss centre
-        int tileX = (int)((NPC.Center.X) / 16f);
-        int tileY = (int)((NPC.Bottom.Y) / 16f);      // bottom edge
-        int tileYSafeGuard = ((int)((NPC.Bottom.Y) / 16f)) - 1 ;      // prevent phase through blocks
-
-        bool hitTile = WorldGen.SolidTile(tileX, tileY) || WorldGen.SolidTile(tileX, tileYSafeGuard);
-        bool timedOut = AITimer >= 160f;
-
-        if (hitTile || timedOut)
-        {
-            _groundSmashHit = true;
-            NPC.velocity    = Vector2.Zero;
-
-            if (Main.netMode != NetmodeID.Server)
-                BossCameraSystem.TriggerShake(14f);
-
-            SoundEngine.PlaySound(CycloneSlam, NPC.Center);
-
-            // ── Rock spawn: check ±25, ±50, ±75 tile offsets ──
-            if (Main.netMode != NetmodeID.MultiplayerClient)
-            {
-                int[] offsets = { -75, -50, -25, 25, 50, 75 };
-
-                foreach (int tileOffsetX in offsets)
-                {
-                    int checkX = tileX + tileOffsetX;
-
-                    // Walk down from the boss Y to find the surface at this X
-                    int surfaceY = tileY;
-                    for (int scanY = tileY; scanY < tileY + 40; scanY++)
-                    {
-                        if (WorldGen.SolidTile(checkX, scanY))
-                        {
-                            surfaceY = scanY;
-                            break;
-                        }
-                    }
-
-                    if (WorldGen.SolidTile(checkX, surfaceY))
-                    {
-                        // Spawn rock just above the solid tile
-                        Vector2 rockPos = new Vector2(
-                            checkX * 16f + 8f,
-                            surfaceY * 16f - 8f
-                        );
-
-                        // Velocity: arc upward, slight outward spread from centre
-                        float horizontalDir   = tileOffsetX > 0 ? 1f : -1f;
-                        float horizontalSpeed = Math.Abs(tileOffsetX) / 25f * 2.5f; // further = more spread
-                        Vector2 rockVel       = new Vector2(horizontalDir * horizontalSpeed, -8f);
-
-                        Projectile.NewProjectile(
-                            NPC.GetSource_FromAI(),
-                            rockPos,
-                            rockVel,
-                            ModContent.ProjectileType<ClusteredRock>(),
-                            10,
-                            2f,
-                            Main.myPlayer
-                        );
-                    }
-                }
-            }
-        }
-        return;
-    }
-
-    // ── Phase 4: brief pause after impact, then reset ──
-
-    // if (AITimer >= 120f)
-    // {
-    //     _groundSmashHit = false;
-    //     AITimer = 0f;
-
-    //     ExtraTimer++;
-    //     if (ExtraTimer >= 3)
-    //     {
-    //         ExtraTimer = 0;
-    //         AIState = (float)ActionState.Reset;
-    //     }
-
-    //     NPC.netUpdate = true;
-    // }
-
-    if (AITimer >= 120f)
-    {
-        _groundSmashHit = false;
-        AITimer = 0f;
-        AIState = (float)ActionState.Reset;
-        NPC.netUpdate = true;
-    }
-}
-
-        private Vector2 DashDirection;
-
-        private void DoBehavior_DisappearingDash() //Final turn!! Stand up, my Vanguard!!
-        {
-            Player player = Main.player[NPC.target];
-            AITimer++;
-
-
-            // Phase 1: Boss disappears (fade out)
-            if (AITimer <= 30f)
-            {
-                NPC.alpha = (int)MathHelper.Lerp(0, 255, AITimer / 30f); // fade OUT
-                NPC.velocity = Vector2.Zero;
-
-                // Force the boss to face the direction it is actually moving (idk why ts glitched)
-                NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
-                return;
-            }
-
-            // Phase 2: At frame 31, spawn telegraph + teleport boss to radius point
-            if (AITimer == 31f && Main.netMode != NetmodeID.MultiplayerClient)
-            {
-                float angle  = Main.rand.NextFloat(0, MathHelper.TwoPi);
-                float radius = 400f;
-
-                Vector2 targetPos = player.Center + radius * new Vector2(
-                    (float)Math.Cos(angle),
-                    (float)Math.Sin(angle)
-                );
-
-                CreateTeleportTelegraph(targetPos);
-
-                NPC.Center    = targetPos;
-                NPC.netUpdate = true;
-            }
-
-            if (AITimer == 59)
-            {
-                ShootSpreadProjectiles(Main.player[NPC.target]);
-            }
-
-            // Phase 3: Wait at the teleport point (still invisible), lock dash direction
-            if (AITimer <= 60f)
-            {
-                NPC.velocity = Vector2.Zero;
-                NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
-                NPC.spriteDirection = NPC.direction;
-
-                // Lock in dash direction once near the launch frame
-                if (AITimer == 55f)
-                {
-                    DashDirection = Vector2.Normalize(player.Center - NPC.Center);
-                    SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
-                }
-                return;
-            }
-
-
-            NPC.velocity = DashDirection * 30f;
-
-            // Force the boss to face the direction it is actually moving (idk why ts glitched)
-            NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
-            
-            if (AITimer > 60)
-            {
-                NPC.velocity *= 0.90f; // friction; tweak for feel
-            }
-
-            // Fade boss back in during dash
-            NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 60) / 30f, 1f));
-
-            if (AITimer > 90)
-            {
-                NPC.velocity = Vector2.Zero;
-            }
-
-            // End attack after dash completes
-            if (AITimer >= 120)
-            {
-                AITimer = 0;
-                DashDirection  = Vector2.Zero;
-                AIState = (float)ActionState.FinalTurn;
-                NPC.alpha      = 0; // fully visible again
-                // transition to next AI state here
-            }
         }
 
         
@@ -817,7 +583,7 @@ private void ShootSpreadProjectiles(Player target)
                 NPC.Center,
                 velocity,
                 ModContent.ProjectileType<CycloneProjectile>(),
-                DashSpreadDamage,
+                AllProjectileDamage,
                 2f,        // knockback
                 Main.myPlayer,
                 ai0: Main.rand.Next(4)
@@ -916,7 +682,7 @@ private void ShootSpreadProjectiles(Player target)
                     spawnPos,
                     velocity,
                     ModContent.ProjectileType<ClusteredRock>(),
-                    10,
+                    AllProjectileDamage,
                     2f,
                     Main.myPlayer
                 );
@@ -1055,14 +821,13 @@ private void DoBehavior_CircleAndShoot()
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-                int damage       = 10;
 
                 Projectile.NewProjectile(
                     NPC.GetSource_FromAI(),
                     NPC.Center,
                     shootDir * 12f,
                     ModContent.ProjectileType<CycloneProjectile>(),
-                    damage,
+                    AllProjectileDamage,
                     2f,
                     Main.myPlayer,
                     ai0: Main.rand.Next(4)
@@ -1193,13 +958,13 @@ private void PickAttack3Range(Player player)
     }
 }
 
+
 private void FireWallVolley(Player player)
 {
     if (Main.netMode == NetmodeID.MultiplayerClient) return;
 
     int   bulletCount = 5;
     float speed       = 4f;
-    int   damage      = 10;
     float direction   = NPC.Center.X < player.Center.X ? 1f : -1f;
 
     for (int i = 0; i < bulletCount; i++)
@@ -1215,7 +980,7 @@ private void FireWallVolley(Player player)
             spawnPos,
             new Vector2(speed * direction, 0f),
             ModContent.ProjectileType<CycloneProjectile>(),
-            damage,
+            AllProjectileDamage,
             2f,
             Main.myPlayer,
             ai0: variant,
@@ -1314,8 +1079,8 @@ private void DoBehavior_FallingRocks()
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-                int damage       = 10;
-                Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4)); 
+    
+                Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,ModContent.ProjectileType<CycloneProjectile>(), AllProjectileDamage, 2f, Main.myPlayer, ai0: Main.rand.Next(4)); 
                 
             }
         }
@@ -1371,7 +1136,6 @@ private void SpawnLaserProjectiles(Player player)
     int lineCount   = 16;
     int lineSpacing = 8 * 16;
     int projSpeed   = 12;
-    int projDamage  = 10;
 
     for (int i = 0; i < lineCount; i++)
     {
@@ -1385,7 +1149,7 @@ private void SpawnLaserProjectiles(Player player)
                 projPos,
                 new Vector2(0, projSpeed),
                 ModContent.ProjectileType<CycloneProjectile>(),
-                projDamage, 2f, Main.myPlayer,
+                AllProjectileDamage, 2f, Main.myPlayer,
                 ai0: Main.rand.Next(4)
             );
         }
@@ -1394,6 +1158,249 @@ private void SpawnLaserProjectiles(Player player)
 
 
 
+private bool _groundSmashHit = false;
+
+private void DoBehavior_GroundSmash()
+{
+    Player player = Main.player[NPC.target];
+
+
+    // ── Phase 1: reposition above player (negative timer ramp-up, same pattern as TripleDash) ──
+    if (AITimer <= 0)
+    {
+        Vector2 targetPos   = player.Center + new Vector2(0f, -280f);
+        Vector2 toTarget    = targetPos - NPC.Center;
+        float   dist        = toTarget.Length();
+        float   rampFrames  = -AITimer;
+        float   maxSpeed    = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
+        Vector2 ideal       = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
+        NPC.velocity        = Vector2.Lerp(NPC.velocity, ideal, 0.07f);
+        NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+
+        bool closeEnough = dist <= 200f && AITimer <= -120;
+        bool tookTooLong = AITimer < -300;
+        if (closeEnough || tookTooLong)
+        {
+            NPC.velocity = Vector2.Zero;
+            AITimer = 1f;   // kick to wind-up
+        }
+        else
+        {
+            AITimer--;
+        }
+        return;
+    }
+
+    AITimer++;
+    
+
+    // ── Phase 2: wind-up (frames 1-40) ──
+    if (AITimer <= 40f)
+    {
+        NPC.velocity        = Vector2.Zero;
+        NPC.spriteDirection = NPC.Center.X < player.Center.X ? 1 : -1;
+
+        if (AITimer == 10f)
+        {
+            SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+            TriggerRoar(40);
+            if (Main.netMode != NetmodeID.Server)
+                BossCameraSystem.TriggerShake(6f);
+        }
+        return;
+    }
+
+    
+    // ── Phase 3: dash downward & tile-check every frame ──
+    if (!_groundSmashHit)
+    {
+        NPC.velocity = new Vector2(0f, 30f);
+
+        // Check the tile directly under the boss centre
+        int tileX = (int)((NPC.Center.X) / 16f);
+        int tileY = (int)((NPC.Bottom.Y) / 16f);      // bottom edge
+        int tileYSafeGuard = ((int)((NPC.Bottom.Y) / 16f)) - 1 ;      // prevent phase through blocks
+
+        bool hitTile = WorldGen.SolidTile(tileX, tileY) || WorldGen.SolidTile(tileX, tileYSafeGuard);
+
+        bool timedOut = AITimer >= 160f;
+
+        if (hitTile || timedOut)
+        {
+            _groundSmashHit = true;
+            NPC.velocity    = Vector2.Zero;
+
+            if (Main.netMode != NetmodeID.Server)
+                BossCameraSystem.TriggerShake(14f);
+
+            SoundEngine.PlaySound(CycloneSlam, NPC.Center);
+
+            // Determine which tileY actually detected the block
+            int effectiveTileY = WorldGen.SolidTile(tileX, tileY) ? tileY : tileYSafeGuard;
+
+
+            // ── Rock spawn: check ±25, ±50, ±75 tile offsets ──
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                
+                int[] offsets = { -75, -50, -25, 25, 50, 75 };
+
+                foreach (int tileOffsetX in offsets)
+                {
+                    int checkX = tileX + tileOffsetX;
+
+                    // Walk down from the boss Y to find the surface at this X
+                    int surfaceY = effectiveTileY;
+                    for (int scanY = effectiveTileY; scanY < effectiveTileY + 40; scanY++)
+                    {
+                        if (WorldGen.SolidTile(checkX, scanY))
+                        {
+                            surfaceY = scanY;
+                            break;
+                        }
+                    }
+
+                    if (WorldGen.SolidTile(checkX, surfaceY))
+                    {
+                        // Spawn rock just above the solid tile
+                        Vector2 rockPos = new Vector2(
+                            checkX * 16f + 8f,
+                            surfaceY * 16f - 8f
+                        );
+
+                        // Velocity: arc upward, slight outward spread from centre
+                        float horizontalDir   = tileOffsetX > 0 ? 1f : -1f;
+                        float horizontalSpeed = Math.Abs(tileOffsetX) / 25f * 2.5f; // further = more spread
+                        Vector2 rockVel       = new Vector2(horizontalDir * horizontalSpeed, -8f);
+
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            rockPos,
+                            rockVel,
+                            ModContent.ProjectileType<ClusteredRock>(),
+                            AllProjectileDamage,
+                            2f,
+                            Main.myPlayer
+                        );
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    // ── Phase 4: brief pause after impact, then reset ──
+
+    // if (AITimer >= 120f)
+    // {
+    //     _groundSmashHit = false;
+    //     AITimer = 0f;
+
+    //     ExtraTimer++;
+    //     if (ExtraTimer >= 3)
+    //     {
+    //         ExtraTimer = 0;
+    //         AIState = (float)ActionState.Reset;
+    //     }
+
+    //     NPC.netUpdate = true;
+    // }
+
+    if (AITimer >= 120f)
+    {
+        _groundSmashHit = false;
+        AITimer = 0f;
+        AIState = (float)ActionState.Reset;
+        NPC.netUpdate = true;
+    }
+}
+
+        private Vector2 DashDirection;
+
+        private void DoBehavior_DisappearingDash() //Final turn!! Stand up, my Vanguard!!
+        {
+            Player player = Main.player[NPC.target];
+            AITimer++;
+
+
+            // Phase 1: Boss disappears (fade out)
+            if (AITimer <= 30f)
+            {
+                NPC.alpha = (int)MathHelper.Lerp(0, 255, AITimer / 30f); // fade OUT
+                NPC.velocity = Vector2.Zero;
+
+                // Force the boss to face the direction it is actually moving (idk why ts glitched)
+                NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
+                return;
+            }
+
+            // Phase 2: At frame 31, spawn telegraph + teleport boss to radius point
+            if (AITimer == 31f && Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                float angle  = Main.rand.NextFloat(0, MathHelper.TwoPi);
+                float radius = 400f;
+
+                Vector2 targetPos = player.Center + radius * new Vector2(
+                    (float)Math.Cos(angle),
+                    (float)Math.Sin(angle)
+                );
+
+                CreateTeleportTelegraph(targetPos);
+
+                NPC.Center    = targetPos;
+                NPC.netUpdate = true;
+            }
+
+            if (AITimer == 59)
+            {
+                ShootSpreadProjectiles(Main.player[NPC.target]);
+            }
+
+            // Phase 3: Wait at the teleport point (still invisible), lock dash direction
+            if (AITimer <= 60f)
+            {
+                NPC.velocity = Vector2.Zero;
+                NPC.direction       = NPC.Center.X < player.Center.X ? 1 : -1;
+                NPC.spriteDirection = NPC.direction;
+
+                // Lock in dash direction once near the launch frame
+                if (AITimer == 55f)
+                {
+                    DashDirection = Vector2.Normalize(player.Center - NPC.Center);
+                    SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
+                }
+                return;
+            }
+
+
+            NPC.velocity = DashDirection * 30f;
+
+            // Force the boss to face the direction it is actually moving (idk why ts glitched)
+            NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
+            
+            if (AITimer > 60)
+            {
+                NPC.velocity *= 0.90f; // friction; tweak for feel
+            }
+
+            // Fade boss back in during dash
+            NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 60) / 30f, 1f));
+
+            if (AITimer > 90)
+            {
+                NPC.velocity = Vector2.Zero;
+            }
+
+            // End attack after dash completes
+            if (AITimer >= 120)
+            {
+                AITimer = 0;
+                DashDirection  = Vector2.Zero;
+                AIState = (float)ActionState.FinalTurn;
+                NPC.alpha      = 0; // fully visible again
+                // transition to next AI state here
+            }
+        }
 
 
 
@@ -1510,7 +1517,6 @@ public static void CreateTeleportTelegraph(Vector2 teleportPosition, float cloud
 private void SpawnRainVolley(Player player)
 {
     int   count   = 3;   // projectiles per volley
-    int   damage  = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
     for (int i = 0; i < count; i++)
     {
@@ -1525,7 +1531,7 @@ private void SpawnRainVolley(Player player)
 
         Projectile.NewProjectile(NPC.GetSource_FromAI(), spawnPos,
         new Vector2(Main.rand.NextFloat(-1f, 1f), 8f),
-        ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
+        ModContent.ProjectileType<CycloneProjectile>(), AllProjectileDamage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
 }
 
@@ -1593,14 +1599,13 @@ private void EnhancedAttack4()
             if (Main.netMode != NetmodeID.MultiplayerClient)
             {
                 Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-                int damage       = NPC.GetAttackDamage_ForProjectiles(30f, 20f);
 
                 Projectile.NewProjectile(
                     NPC.GetSource_FromAI(),
                     NPC.Center,
                     shootDir * 10f,
                     ModContent.ProjectileType<CycloneProjectile>(),
-                    damage,
+                    AllProjectileDamage,
                     2f,
                     Main.myPlayer,
                     ai0: Main.rand.Next(4)
@@ -1672,7 +1677,7 @@ private void DoBehavior_SpawnMiniCyclones(Player target)
                 spawnPosition,
                 pearlShootVelocity,
                 ModContent.ProjectileType<MiniCyclone>(),
-                10,
+                AllProjectileDamage,
                 0f,
                 Main.myPlayer
                 );
@@ -1686,7 +1691,7 @@ private void DoBehavior_SpawnMiniCyclones(Player target)
                 spawnPosition,
                 pearlShootVelocity,
                 ModContent.ProjectileType<MiniCyclone>(),
-                10,
+                AllProjectileDamage,
                 0f,
                 Main.myPlayer
                 );
@@ -1801,6 +1806,7 @@ public class CycloneClone : ModNPC
         
     }
 
+    public static int AllProjectileDamage => 20;
     
 
     public override void FindFrame(int frameHeight)
@@ -1987,11 +1993,10 @@ private void DoAttack2()
             SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
             Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-            int damage       = 10;
 
 
             Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 12f,
-            ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
+            ModContent.ProjectileType<CycloneProjectile>(), AllProjectileDamage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
         }
 
         return;
@@ -2084,7 +2089,7 @@ private void DoAttack3()
                         new Vector2(NPC.Center.X, spawnY),
                         new Vector2(shootDirX, 0f),
                         ModContent.ProjectileType<CycloneProjectile>(),
-                        10,
+                        AllProjectileDamage,
                         2f,
                         Main.myPlayer,
                         ai0: Main.rand.Next(4),
@@ -2143,9 +2148,8 @@ private void DoAttack4()
         SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
         Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-        int damage       = 10;
         Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 10f,
-        ModContent.ProjectileType<CycloneProjectile>(), damage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
+        ModContent.ProjectileType<CycloneProjectile>(), AllProjectileDamage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
     }
     }
 
