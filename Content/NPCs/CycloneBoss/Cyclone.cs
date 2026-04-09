@@ -643,7 +643,7 @@ private void ShootSpreadProjectiles(Player target)
                 ShootLingeringRockProjectiles();
             }
 
-            if (AITimer >= 210f)
+            if (AITimer >= 151f)
             {
                 AITimer = 0f;
                 AIState = (float)ActionState.Reset;
@@ -1210,18 +1210,21 @@ private void DoBehavior_GroundSmash()
         return;
     }
 
-    
+    float AllowContactTimer = AITimer - 40;
     // ── Phase 3: dash downward & tile-check every frame ──
     if (!_groundSmashHit)
     {
         NPC.velocity = new Vector2(0f, 30f);
+
+        if (AllowContactTimer <= 6f) 
+        return;
 
         // Check the tile directly under the boss centre
         int tileX = (int)((NPC.Center.X) / 16f);
         int tileY = (int)((NPC.Bottom.Y) / 16f);      // bottom edge
         int tileYSafeGuard = ((int)((NPC.Bottom.Y) / 16f)) - 1 ;      // prevent phase through blocks
 
-        bool hitTile = WorldGen.SolidTile(tileX, tileY) || WorldGen.SolidTile(tileX, tileYSafeGuard);
+        bool hitTile = IsSolidOrPlatform(tileX, tileY) || IsSolidOrPlatform(tileX, tileYSafeGuard);
 
         bool timedOut = AITimer >= 160f;
 
@@ -1236,7 +1239,7 @@ private void DoBehavior_GroundSmash()
             SoundEngine.PlaySound(CycloneSlam, NPC.Center);
 
             // Determine which tileY actually detected the block
-            int effectiveTileY = WorldGen.SolidTile(tileX, tileY) ? tileY : tileYSafeGuard;
+            int effectiveTileY = IsSolidOrPlatform(tileX, tileY) ? tileY : tileYSafeGuard;
 
 
             // ── Rock spawn: check ±25, ±50, ±75 tile offsets ──
@@ -1253,14 +1256,14 @@ private void DoBehavior_GroundSmash()
                     int surfaceY = effectiveTileY;
                     for (int scanY = effectiveTileY; scanY < effectiveTileY + 40; scanY++)
                     {
-                        if (WorldGen.SolidTile(checkX, scanY))
+                        if (IsSolidOrPlatform(checkX, scanY))
                         {
                             surfaceY = scanY;
                             break;
                         }
                     }
 
-                    if (WorldGen.SolidTile(checkX, surfaceY))
+                    if (IsSolidOrPlatform(checkX, surfaceY))
                     {
                         // Spawn rock just above the solid tile
                         Vector2 rockPos = new Vector2(
@@ -1313,6 +1316,12 @@ private void DoBehavior_GroundSmash()
         AIState = (float)ActionState.Reset;
         NPC.netUpdate = true;
     }
+}
+
+private static bool IsSolidOrPlatform(int x, int y)
+{
+    Tile tile = Framing.GetTileSafely(x, y);
+    return tile.HasTile && (Main.tileSolid[tile.TileType] || TileID.Sets.Platforms[tile.TileType]);
 }
 
         private Vector2 DashDirection;

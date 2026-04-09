@@ -259,6 +259,7 @@ public class ClusteredRock : ModProjectile
                 d.noGravity = false;
             }
         }
+        // SoundEngine.PlaySound(new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneRockLand") with { PitchVariance = 0.2f }, Projectile.position);
 
         Projectile.Kill();
     }
@@ -284,6 +285,13 @@ public class ClusteredRock : ModProjectile
 
             // Optional: pulse or glow effect over time
             Lighting.AddLight(Projectile.Center, 0.8f, 0.3f, 0.1f);
+
+            // Fade out during the last 60 ticks (1 second)
+            int fadeDuration = 60;
+            if (Projectile.timeLeft < fadeDuration)
+            {
+                Projectile.alpha = (int)(255 * (1f - (float)Projectile.timeLeft / fadeDuration));
+            }
         }
 
     }
