@@ -16,6 +16,7 @@ namespace TheBattleCats.Common.Systems
 
         public void Update(ref CameraInfo cameraInfo)
         {
+            
             if (PanProgress <= 0f) return;
 
             float smooth = SmoothStep(PanProgress);

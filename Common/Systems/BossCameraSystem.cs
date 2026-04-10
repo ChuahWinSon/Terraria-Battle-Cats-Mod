@@ -38,9 +38,12 @@ namespace TheBattleCats.Common.Systems
                 Shake = Math.Max(Shake - 1, 0);
             }
         }
+        
 
         public override void PostUpdateEverything()
         {
+
+
             // Find the boss
             NPC boss = null;
             foreach (NPC npc in Main.ActiveNPCs)

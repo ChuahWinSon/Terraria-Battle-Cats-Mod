@@ -17,6 +17,7 @@ namespace TheBattleCats.Content.Items.Consumables
         public override void SetDefaults() {
 			Item.width = 20;
 			Item.height = 20;
+			Item.maxStack = 999;
 			Item.value = 100;
 			Item.rare = ItemRarityID.Blue;
 			Item.useAnimation = 30;
@@ -36,43 +37,32 @@ namespace TheBattleCats.Content.Items.Consumables
 			return !NPC.AnyNPCs(ModContent.NPCType<Cyclone>());
 		}
 
-		public override bool? UseItem(Player player) {
-			if (player.whoAmI == Main.myPlayer) {
-				// If the player using the item is the client
-				// (explicitly excluded serverside here)
-				SoundStyle customSound = new SoundStyle("TheBattleCats/Assets/Effects/BossShockwave")
-				{
-    			Volume = 1.0f,  // Max volume
-    			Pitch = 0.0f,   // Normal pitch
-    			PitchVariance = 0.0f // Adds random pitch variation
-				};
+public override bool? UseItem(Player player) {
+    if (player.whoAmI == Main.myPlayer) {
+        SoundStyle customSound = new SoundStyle("TheBattleCats/Assets/Effects/BossShockwave")
+        {
+            Volume = 1.0f,
+            Pitch = 0.0f,
+            PitchVariance = 0.0f
+        };
+        SoundEngine.PlaySound(customSound, player.position);
+    }
 
-				// Play the sound at NPC's position
-				SoundEngine.PlaySound(customSound, player.position);
+    if (Main.netMode != NetmodeID.MultiplayerClient) {
+        int spawnX = (int)player.Center.X + (player.direction * 200);
+        int spawnY = (int)player.Center.Y - 200;
 
-				int type = ModContent.NPCType<Cyclone>();
-                int spawnX = (int)player.Center.X + (player.direction * 200);
-                int spawnY = (int)player.Center.Y - 200;
+        int npcIndex = NPC.NewNPC(
+            NPC.GetBossSpawnSource(player.whoAmI),
+            spawnX,
+            spawnY,
+            ModContent.NPCType<Cyclone>()
+        );
+        NetMessage.SendData(MessageID.SyncNPC, -1, -1, null, npcIndex);
+    }
 
-				if (Main.netMode != NetmodeID.MultiplayerClient) {
-                // Spawn directly at player's center position (on-screen)
-                int npcIndex = NPC.NewNPC(
-                    NPC.GetBossSpawnSource(player.whoAmI),
-                    spawnX,
-                    spawnY, 
-                    type
-                );
+    return true;
+}
 
-                
-            }
-                            else {
-					// If the player is in multiplayer, request a spawn
-					// This will only work if NPCID.Sets.MPAllowedEnemies[type] is true, which we set in MinionBossBody
-					NetMessage.SendData(MessageID.SpawnBossUseLicenseStartEvent, number: player.whoAmI, number2: type);
-				}
-			}
-
-			return true;
-		}
     }
 }

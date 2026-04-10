@@ -114,6 +114,19 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void FindFrame(int frameHeight)
         {
+            if (Main.dedServ) // server has no textures, use default frame logic
+            {
+                NPC.frameCounter++;
+                if (NPC.frameCounter >= 4)
+                {
+                    NPC.frameCounter = 0;
+                    NPC.frame.Y += frameHeight;
+                    if (NPC.frame.Y >= frameHeight * Main.npcFrameCount[NPC.type])
+                        NPC.frame.Y = 0;
+                }
+                return;
+            }
+
             Texture2D activeTex = IsRoaring ? RoarTexture.Value : TextureAssets.Npc[NPC.type].Value;
             int correctHeight = activeTex.Height / ActiveFrameCount;
 
@@ -185,6 +198,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private bool IsRoaring => SpinTimer > 0;
         public override void Load()
         {
+            if (!Main.dedServ)
             RoarTexture = ModContent.Request<Texture2D>("TheBattleCats/Content/NPCs/CycloneBoss/Cyclone_Roar");
         }
         private int ActiveFrameCount = 29; // replace all Main.npcFrameCount[NPC.type] mutations
@@ -199,14 +213,26 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         
 
-        public override void Unload() => RoarTexture = null;
+        public override void Unload()
+        {
+            if (!Main.dedServ)
+                RoarTexture = null;
+        }
 
 
         private float LifeRatio;
 
+        private bool _panStarted = false;
         private ActionState PreviousState = ActionState.Reset;
         public override void AI()
         {
+
+            if (!_panStarted && AITimer < 60f && Main.netMode != NetmodeID.Server)
+            {
+                _panStarted = true;
+                BossCameraSystem.StartBossPan(NPC.Center, panDuration: 90, holdDuration: 210);
+            }
+
 
             // makes movement look more fluid
             NPC.rotation = MathHelper.Clamp(NPC.velocity.X * 0.04f, -MathHelper.Pi / 6f, MathHelper.Pi / 6f);
@@ -320,18 +346,15 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         private void DoBehavior_SpawnAnimation()
         {
+
+            Player player = Main.player[NPC.target];
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
             // Make boss invulnerable and non-contact during entire spawn animation
             NPC.dontTakeDamage = true;
 
             // Disable contact damage with players
             NPC.damage = 0;
 
-            if (AITimer == 0)
-            {
-                // Only trigger camera on client
-                if (Main.netMode != NetmodeID.Server)
-                    BossCameraSystem.StartBossPan(NPC.Center, panDuration: 90, holdDuration: 210);
-            }
             AITimer++;
 
             if (AITimer < 120)
@@ -435,11 +458,12 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private void DoBehavior_TripleDashAttack()
         {
             Player player = Main.player[NPC.target];
-
+            
             // Phase 1: move to above player while AITimer is negative
             if (AITimer <= 0)
             {
-                Vector2 targetPos = player.Center + new Vector2(0f, -200f);
+                NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+                Vector2 targetPos = player.Center + new Vector2(0f, -300f);
                 Vector2 toTarget = targetPos - NPC.Center;
                 float dist = toTarget.Length();
 
@@ -447,9 +471,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 float maxSpeed = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
                 Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
                 NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
-                NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
+                
 
-                if (dist <= 240f && AITimer <= -120 || AITimer < -240) // at least 180 frames and close or already been 600 frames
+                if (dist <= 280f && AITimer <= -120 || AITimer < -240) // at least 180 frames and close or already been 600 frames
                 {
                     NPC.velocity = Vector2.Zero;
 
@@ -483,7 +507,8 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
             // --- Dash 2: UP (back above player) ---
             if (localFrame == 45)
-            {
+            {   
+                NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
                 Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
                 NPC.velocity = direction * 24f;
 
@@ -494,6 +519,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             // --- Dash 3: DOWN + projectiles ---
             if (localFrame == 105)
             {
+                NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
                 // Shoot 5 projectiles in a spread BEFORE the dash
                 ShootSpreadProjectiles(Main.player[NPC.target]);
 
@@ -571,7 +597,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             // Phase 1: Reposition above player 
             if (AITimer <= 120)
             {
-                Vector2 targetPos = player.Center + new Vector2(0f, -100f);
+                Vector2 targetPos = player.Center + new Vector2(0f, -300f);
                 Vector2 toTarget = targetPos - NPC.Center;
                 float dist = toTarget.Length();
 
@@ -1234,6 +1260,9 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         public override void SetDefaults()
         {
+
+            if (Main.netMode == NetmodeID.Server)
+        Main.NewText("Cyclone SetDefaults running on server");
             NPC.width = 110;
             NPC.height = 110;
             NPC.damage = 1;
