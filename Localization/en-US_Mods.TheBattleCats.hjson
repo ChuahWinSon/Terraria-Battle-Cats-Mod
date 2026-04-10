@@ -118,6 +118,16 @@ Items: {
 		Tooltip: ""
 		DisplayName: Cyclone Summon Item
 	}
+
+	RockInABottle: {
+		DisplayName: Rock In A Bottle
+		Tooltip: ""
+	}
+
+	DebrisInABottle: {
+		Tooltip: ""
+		DisplayName: Debris In A Bottle
+	}
 }
 
 Buffs: {

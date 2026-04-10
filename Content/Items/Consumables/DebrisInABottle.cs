@@ -7,7 +7,7 @@ using TheBattleCats.Common.Systems;
 
 namespace TheBattleCats.Content.Items.Consumables
 {
-	public class CycloneSummonItem : ModItem
+	public class DebrisInABottle : ModItem
     {
         public override void SetStaticDefaults()
         {
@@ -17,7 +17,6 @@ namespace TheBattleCats.Content.Items.Consumables
         public override void SetDefaults() {
 			Item.width = 20;
 			Item.height = 20;
-			Item.maxStack = 20;
 			Item.value = 100;
 			Item.rare = ItemRarityID.Blue;
 			Item.useAnimation = 30;
