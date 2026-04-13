@@ -25,15 +25,14 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         {
             Spawn,
             Reset,
-
             TripleDashAttack,
             CircleAndShoot,
             SansWall,
             LingeringRocks,
             MiniCyclones,
             GroundSmash,
-
-            FinalTurn
+            FinalTurn,
+            Death
         }
 
         public ref float AIState => ref NPC.ai[0];
@@ -42,7 +41,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public ref float ExtraTimer => ref NPC.ai[3];
 
 
-        public static int DashSpreadDamage => 20;
 
         public static int AllProjectileDamage => 20;
 
@@ -102,7 +100,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void OnKill()
         {
             SpinTimer = 0;
-            ActiveFrameCount = 29; 
+            ActiveFrameCount = 29;
         }
 
         public override void OnSpawn(IEntitySource source)
@@ -169,7 +167,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 return;
             }
 
-            if (NPC.life <= 0)
+            if (NPC.life <= 0 && _deathAnimationStarted)
             {
                 // These gores work by simply existing as a texture inside any folder which path contains "Gores/"
                 int backGoreType = Mod.Find<ModGore>("CycloneBossBody_Bottom").Type;
@@ -199,7 +197,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         public override void Load()
         {
             if (!Main.dedServ)
-            RoarTexture = ModContent.Request<Texture2D>("TheBattleCats/Content/NPCs/CycloneBoss/Cyclone_Roar");
+                RoarTexture = ModContent.Request<Texture2D>("TheBattleCats/Content/NPCs/CycloneBoss/Cyclone_Roar");
         }
         private int ActiveFrameCount = 29; // replace all Main.npcFrameCount[NPC.type] mutations
 
@@ -211,7 +209,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             ActiveFrameCount = 6;
         }
 
-        
+
 
         public override void Unload()
         {
@@ -243,7 +241,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 if (SpinTimer == 0)
                 {
                     NPC.frame.Y = 0;
-                    ActiveFrameCount = 29; 
+                    ActiveFrameCount = 29;
                 }
             }
 
@@ -294,13 +292,14 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 case (float)ActionState.FinalTurn:
                     DoBehavior_DisappearingDash();
                     break;
-
-
+                case (float)ActionState.Death:
+                    DoBehavior_DeathAnimation();
+                    break;
             }
 
 
             //spliting rocks
-            if (LifeRatio < 0.5 && AITimer % 100 == 99)
+            if (LifeRatio < 0.5 && AITimer % 100 == 99 && LifeRatio > 0.1f)
             {
                 Vector2 velocity = new Vector2(0f, 5f);
 
@@ -320,7 +319,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             }
 
             //spliting rocks
-            if (LifeRatio < 0.7 && AITimer % 150 == 149)
+            if (LifeRatio < 0.7 && AITimer % 150 == 149 && LifeRatio > 0.1f)
             {
                 Vector2 velocity = new Vector2(0f, 5f);
                 if (Main.netMode != NetmodeID.MultiplayerClient)
@@ -343,7 +342,153 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         }
 
+private bool _deathAnimationStarted = false;
 
+public override bool CheckDead()
+{
+    if (_deathAnimationStarted) return true; // let it die for real after animation
+
+    _deathAnimationStarted = true;
+    NPC.life = 1;
+    NPC.dontTakeDamage = true;
+    AIState = (float)ActionState.Death;
+    AITimer = 0f;
+    NPC.netUpdate = true;
+    return false; // block actual death
+}
+
+        private void DoBehavior_DeathAnimation()
+{
+    AITimer++;
+    NPC.velocity = Vector2.Zero;
+    NPC.dontTakeDamage = true;
+
+    // Camera pan to boss
+    if (AITimer == 1f && Main.netMode != NetmodeID.Server)
+        BossCameraSystem.StartBossPan(NPC.Center, panDuration: 30, holdDuration: 300);
+
+    // Phase 1 (0-60): Float upward slowly
+    if (AITimer <= 60f)
+    {
+        NPC.velocity = new Vector2(0f, -1.5f);
+        // White glow pulse using NPC color tint
+        float glowStrength = AITimer / 60f;
+        NPC.color = Color.Lerp(Color.Transparent, Color.White, glowStrength * 0.6f);
+        return;
+    }
+
+    // Phase 2 (60-150): Cracking/flashing - rapid white flash pulses + dust lines
+    if (AITimer <= 150f)
+    {
+        NPC.velocity = new Vector2(0f, -0.5f); // slow float
+
+        // Flickering white overlay - pulses faster as it progresses
+        float progress = (AITimer - 60f) / 90f;
+        float flickerSpeed = MathHelper.Lerp(8f, 2f, progress); // gets faster
+        NPC.color = (AITimer % flickerSpeed < flickerSpeed / 2f)
+            ? Color.Lerp(Color.White, new Color(200, 200, 255), progress)
+            : Color.Transparent;
+
+        // Spawn "crack" dust lines radiating outward
+        if (Main.netMode != NetmodeID.Server && AITimer % 8 == 0)
+        {
+            SpawnCrackEffect(progress);
+        }
+
+        // Camera shake that builds
+        if (Main.netMode != NetmodeID.Server && AITimer % 15 == 0)
+            BossCameraSystem.TriggerShake(progress * 8f);
+
+        return;
+    }
+
+    // Phase 3 (150-160): Freeze, full white, big shake
+    if (AITimer <= 160f)
+    {
+        NPC.velocity = Vector2.Zero;
+        NPC.color = Color.White;
+        NPC.alpha = 0;
+
+        if (AITimer == 151f && Main.netMode != NetmodeID.Server)
+            BossCameraSystem.TriggerShake(20f);
+        return;
+    }
+
+    // Phase 4 (160): EXPLODE - spawn burst dust, gore, screen flash
+    if (AITimer == 161f)
+    {
+        SoundEngine.PlaySound(CycloneRoarGor, NPC.Center);
+
+        if (Main.netMode != NetmodeID.Server)
+        {
+            BossCameraSystem.TriggerShake(30f);
+            SpawnExplosionEffect();
+        }
+        return;
+    }
+
+    // Phase 5 (161-200): Fade out NPC after explosion
+    if (AITimer <= 200f)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(0, 255, (AITimer - 161f) / 39f);
+        return;
+    }
+
+    // Done - let it actually die
+    if (AITimer >= 200f)
+    {
+        _deathAnimationStarted = true; // already true, but safety
+        NPC.life = 0;
+        NPC.HitEffect(); // trigger gore
+        NPC.active = false;
+    }
+}
+
+
+private void SpawnCrackEffect(float progress)
+{
+    int dustCount = Main.rand.Next(2, 5);
+    for (int i = 0; i < dustCount; i++)
+    {
+        float angle = Main.rand.NextFloat(MathHelper.TwoPi);
+        float speed = MathHelper.Lerp(2f, 6f, progress);
+        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed;
+
+        // White/light blue dust for crack lines
+        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Electric, vel.X, vel.Y);
+        d.color = Color.Lerp(Color.White, new Color(180, 200, 255), progress);
+        d.noGravity = true;
+        d.scale = MathHelper.Lerp(1.5f, 3f, progress);
+        d.fadeIn = 0.5f;
+    }
+}
+
+private void SpawnExplosionEffect()
+{
+    // Big radial burst
+    for (int i = 0; i < 40; i++)
+    {
+        float angle = MathHelper.TwoPi * i / 40f;
+        float speed = Main.rand.NextFloat(4f, 14f);
+        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed;
+
+        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Electric, vel.X, vel.Y);
+        d.color = Color.White;
+        d.noGravity = true;
+        d.scale = Main.rand.NextFloat(2f, 4f);
+        d.fadeIn = 1f;
+    }
+
+    // Some colored sparks
+    for (int i = 0; i < 20; i++)
+    {
+        float angle = Main.rand.NextFloat(MathHelper.TwoPi);
+        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * Main.rand.NextFloat(3f, 10f);
+        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Torch, vel.X, vel.Y);
+        d.noGravity = false;
+        d.scale = 2f;
+    }
+}
         private void DoBehavior_SpawnAnimation()
         {
 
@@ -458,7 +603,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
         private void DoBehavior_TripleDashAttack()
         {
             Player player = Main.player[NPC.target];
-            
+
             // Phase 1: move to above player while AITimer is negative
             if (AITimer <= 0)
             {
@@ -471,7 +616,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 float maxSpeed = MathHelper.Clamp(rampFrames * 0.3f, 1f, 40f);
                 Vector2 idealVelocity = Vector2.Normalize(toTarget) * Math.Min(dist * 0.08f, maxSpeed);
                 NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.07f);
-                
+
 
                 if (dist <= 280f && AITimer <= -120 || AITimer < -240) // at least 180 frames and close or already been 600 frames
                 {
@@ -507,7 +652,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
             // --- Dash 2: UP (back above player) ---
             if (localFrame == 45)
-            {   
+            {
                 NPC.spriteDirection = player.Center.X > NPC.Center.X ? 1 : -1;
                 Vector2 direction = Vector2.Normalize(player.Center - NPC.Center); // aim at player
                 NPC.velocity = direction * 24f;
@@ -760,8 +905,10 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                             ai0: Main.rand.Next(4)
                         );
 
-                        SoundEngine.PlaySound(ProjectileSound, NPC.Center);
+                        
                     }
+
+                    SoundEngine.PlaySound(ProjectileSound, NPC.Center);
                 }
 
                 return;
@@ -844,6 +991,7 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                     AttackTimer = 0;
                     AttackTimer = Main.rand.Next(3);
                     FireWallVolley(player);
+                    SoundEngine.PlaySound(ProjectileSound, NPC.Center);
                 }
 
                 return;
@@ -1044,53 +1192,61 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
         private Vector2 DashDirection;
 
-        private void DoBehavior_DisappearingDash() //Final turn!! Stand up, my Vanguard!!
+        private void DoBehavior_DisappearingDash()
         {
+
+
             Player player = Main.player[NPC.target];
             AITimer++;
 
-
-            // Phase 1: Boss disappears (fade out)
+            // Phase 1: fade out
             if (AITimer <= 30f)
             {
-                NPC.alpha = (int)MathHelper.Lerp(0, 255, AITimer / 30f); // fade OUT
+                NPC.alpha = (int)MathHelper.Lerp(0, 255, AITimer / 30f);
                 NPC.velocity = Vector2.Zero;
-
-                // Force the boss to face the direction it is actually moving (idk why ts glitched)
-                NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
+                NPC.spriteDirection = NPC.direction = (DashDirection.X >= 0 ? 1 : -1);
                 return;
             }
 
-            // Phase 2: At frame 31, spawn telegraph + teleport boss to radius point
-            if (AITimer == 31f && Main.netMode != NetmodeID.MultiplayerClient)
+            // Phase 2: server picks teleport position and syncs it
+            if (AITimer == 31f)
             {
-                float angle = Main.rand.NextFloat(0, MathHelper.TwoPi);
-                float radius = 400f;
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    float angle = Main.rand.NextFloat(0, MathHelper.TwoPi);
+                    float radius = 400f;
 
-                Vector2 targetPos = player.Center + radius * new Vector2(
-                    (float)Math.Cos(angle),
-                    (float)Math.Sin(angle)
-                );
+                    NPC.Center = player.Center + radius * new Vector2(
+                        (float)Math.Cos(angle),
+                        (float)Math.Sin(angle)
+                    );
 
-                CreateTeleportTelegraph(targetPos);
-
-                NPC.Center = targetPos;
-                NPC.netUpdate = true;
+                    NPC.velocity = Vector2.Zero; // clear any leftover velocity on teleport
+                    NPC.netUpdate = true;
+                }
+                return; // wait one frame for the sync to arrive before spawning cloud
             }
 
-            if (AITimer == 59)
+            // Phase 3: spawn cloud 2 frame later so clients have the synced position
+            if (AITimer == 32f)
+            {
+                if (Main.netMode != NetmodeID.Server)
+                    CreateTeleportTelegraph(NPC.Center);
+                return;
+            }
+
+            if (AITimer == 59f)
             {
                 ShootSpreadProjectiles(Main.player[NPC.target]);
             }
 
-            // Phase 3: Wait at the teleport point (still invisible), lock dash direction
+            // Phase 4: hold at teleport point, lock dash direction
             if (AITimer <= 60f)
             {
-                NPC.velocity = Vector2.Zero;
+                NPC.velocity = Vector2.Zero; // keep zeroed every frame so no drift
                 NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
                 NPC.spriteDirection = NPC.direction;
 
-                // Lock in dash direction once near the launch frame
                 if (AITimer == 55f)
                 {
                     DashDirection = Vector2.Normalize(player.Center - NPC.Center);
@@ -1100,33 +1256,28 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
                 return;
             }
 
-
+            // Phase 5: dash
             NPC.velocity = DashDirection * 30f;
+            NPC.spriteDirection = NPC.direction = (DashDirection.X >= 0 ? 1 : -1);
 
-            // Force the boss to face the direction it is actually moving (idk why ts glitched)
-            NPC.spriteDirection = NPC.direction = (DashDirection.X > 0 ? 1 : -1);
+            if (AITimer > 60f)
+                NPC.velocity *= 0.90f;
 
-            if (AITimer > 60)
-            {
-                NPC.velocity *= 0.90f; // friction; tweak for feel
-            }
+            NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 60f) / 30f, 1f));
 
-            // Fade boss back in during dash
-            NPC.alpha = (int)MathHelper.Lerp(255, 0, Math.Min((AITimer - 60) / 30f, 1f));
-
-            if (AITimer > 90)
+            if (AITimer > 90f)
             {
                 NPC.velocity = Vector2.Zero;
             }
 
-            // End attack after dash completes
-            if (AITimer >= 120)
+            if (AITimer >= 120f)
             {
-                AITimer = 0;
+                AITimer = 0f;
                 DashDirection = Vector2.Zero;
                 AIState = (float)ActionState.FinalTurn;
-                NPC.alpha = 0; // fully visible again
-                // transition to next AI state here
+                NPC.alpha = 0;
+                NPC.velocity = Vector2.Zero;
+                NPC.netUpdate = true;
             }
         }
 
@@ -1226,261 +1377,218 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
 
 
 
+   public class CycloneClone : ModNPC
+{
+    public ref float AITimer => ref NPC.ai[0];
+    //npc.ai[1] is the attack we pass through
+    //npc.ai[2] is being used to pass info from boss
+    public ref float ExtraIncrement => ref NPC.ai[3];
+    private Vector2 LaunchTarget = Vector2.Zero;
 
+    private const int FadeInDuration = 59;
+    private const int TargetAlpha = 200;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    public class CycloneClone : ModNPC
+    private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneProjectile")
     {
-        public ref float AITimer => ref NPC.ai[0];
-        //npc.ai[1] is the attack we pass through
-        //npc.ai[2] is being used to pass info from boss
-        public ref float ExtraIncrement => ref NPC.ai[3];
-        private Vector2 LaunchTarget = Vector2.Zero;
+        PitchVariance = 0.2f,
+    };
 
-        private const int FadeInDuration = 59;
-        private const int TargetAlpha = 200; // semi transparent, lower = more visible
+    public override void SetDefaults()
+    {
+        NPC.width = 110;
+        NPC.height = 110;
+        NPC.damage = 1;
+        NPC.defense = 0;
+        NPC.lifeMax = 1;
+        NPC.noGravity = true;
+        NPC.noTileCollide = true;
+        NPC.knockBackResist = 0f;
+        NPC.alpha = 255;
+        NPC.dontTakeDamage = true;
+    }
 
-        private static readonly SoundStyle ProjectileSound = new SoundStyle("TheBattleCats/Assets/Boss/Cyclone/CycloneProjectile")
+    public override void SetStaticDefaults()
+    {
+        Main.npcFrameCount[NPC.type] = 29;
+    }
+
+    public static int AllProjectileDamage => 20;
+
+    public override void FindFrame(int frameHeight)
+    {
+        NPC.frameCounter++;
+        if (NPC.frameCounter >= 4)
         {
-            PitchVariance = 0.2f, // adds slight random pitch variation each play, stops it sounding repetitive
-        };
+            NPC.frameCounter = 0;
+            NPC.frame.Y += frameHeight;
+            if (NPC.frame.Y >= frameHeight * Main.npcFrameCount[NPC.type])
+                NPC.frame.Y = 0;
+        }
+    }
 
-        public override void SetDefaults()
+    private float OrbitRadius2 = 400f;
+    private const float OrbitSpeed2 = 0.02f;
+    private const float CloneAttack3Height = 160f;
+
+    public override void AI()
+    {
+        NPC.TargetClosest(true);
+
+        switch ((int)NPC.ai[1])
         {
+            case 2: DoBehavior_CloneCircleAndShoot(); break;
+            case 3: DoBehavior_CloneSansWall(); break;
+        }
+    }
 
-            if (Main.netMode == NetmodeID.Server)
-        Main.NewText("Cyclone SetDefaults running on server");
-            NPC.width = 110;
-            NPC.height = 110;
-            NPC.damage = 1;
-            NPC.defense = 0;
-            NPC.lifeMax = 1;
-            NPC.noGravity = true;
-            NPC.noTileCollide = true;
-            NPC.knockBackResist = 0f;
-            NPC.alpha = 255; // start invisible
-            NPC.dontTakeDamage = true;
+    private void DoBehavior_CloneCircleAndShoot()
+    {
+        Player player = Main.player[NPC.target];
+        AITimer++;
+
+        if (AITimer == 1f)
+        {
+            // Store the initial angle into ai[3] so it's synced via NPC.ai
+            NPC.ai[3] = NPC.ai[2];
+            NPC.alpha = 255;
+            NPC.velocity = Vector2.Zero;
+            NPC.netUpdate = true;
         }
 
-        public override void SetStaticDefaults()
+        if (AITimer >= 1f && AITimer < 360f)
         {
-            Main.npcFrameCount[NPC.type] = 29;
+            NPC.alpha = (int)MathHelper.Lerp(255, 140, Math.Min(AITimer / 60f, 1f));
 
-        }
+            // Advance orbit angle stored in ai[3] — synced automatically via NPC.ai
+            NPC.ai[3] += OrbitSpeed2;
 
-        public static int AllProjectileDamage => 20;
+            Vector2 targetPos = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(NPC.ai[3]);
+            Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center)
+                * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+            NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
 
+            NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
+            NPC.spriteDirection = NPC.direction;
 
-        public override void FindFrame(int frameHeight)
-        {
-            NPC.frameCounter++;
-            if (NPC.frameCounter >= 4) // 12 fps
+            // Deterministic shoot timing driven from AITimer — no separate counter needed
+            if (AITimer >= 60f && (AITimer - 60f) % 50f == 0f)
             {
-                NPC.frameCounter = 0;
-                NPC.frame.Y += frameHeight;
-                if (NPC.frame.Y >= frameHeight * Main.npcFrameCount[NPC.type])
-                    NPC.frame.Y = 0;
-            }
-        }
-
-        private int Attack2ShootTimer = 0;
-        private float OrbitRadius2 = 400f;
-        private const float OrbitSpeed2 = 0.02f;
-        private float Attack2OrbitAngle = 0f;
-
-        public override void AI()
-        {
-            Player player = Main.player[NPC.target];
-            NPC.TargetClosest(true);
-
-
-            switch ((int)NPC.ai[1])
-            {
-                case 2: DoAttack2(); break;
-                case 3: DoAttack3(); break;
-            }
-
-
-        }
-
-
-
-
-
-
-        private void DoAttack2()
-        {
-            Player player = Main.player[NPC.target];
-            AITimer++;
-            if (AITimer == 1f)
-            {
-                Attack2OrbitAngle = NPC.ai[2]; // use angle passed from boss
-                NPC.alpha = 255;
-                NPC.velocity = Vector2.Zero;
-                NPC.netUpdate = true;
-            }
-
-            // Orbit and shoot
-            if (AITimer >= 1f && AITimer < 360f)
-            {
-                NPC.alpha = (int)MathHelper.Lerp(255, 140, Math.Min(AITimer / 60f, 1f));
-                NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
-                NPC.spriteDirection = NPC.direction;
-
-                Attack2OrbitAngle += OrbitSpeed2;
-
-                Vector2 targetPos = player.Center + new Vector2(OrbitRadius2, 0f).RotatedBy(Attack2OrbitAngle);
-                Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
-                NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.10f);
-
-                NPC.direction = NPC.Center.X < player.Center.X ? 1 : -1;
-                NPC.spriteDirection = NPC.direction;
-
-                Attack2ShootTimer++;
-                if (Attack2ShootTimer >= 50 && Main.netMode != NetmodeID.MultiplayerClient)
-                {
-                    Attack2ShootTimer = 0;
-
+                // Sound plays on everyone
+                if (Main.netMode != NetmodeID.Server)
                     SoundEngine.PlaySound(ProjectileSound, NPC.Center);
 
-                    Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
-
-
-                    Projectile.NewProjectile(NPC.GetSource_FromAI(), NPC.Center, shootDir * 12f,
-                    ModContent.ProjectileType<CycloneProjectile>(), AllProjectileDamage, 2f, Main.myPlayer, ai0: Main.rand.Next(4));
-                }
-
-                return;
-            }
-
-            // Fade out
-            if (AITimer >= 360f && AITimer < 420f)
-            {
-                NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 360f) / 60f, 1f));
-                NPC.velocity *= 0.9f;
-                return;
-            }
-
-            if (AITimer >= 420f)
-                NPC.active = false;
-        }
-
-
-        private int CloneAttack3ShootTimer = 0;
-        private float CloneAttack3StartY = 0f;
-        private float CloneAttack3EndY = 0f;
-        private const float CloneAttack3Height = 160f;
-
-        private void DoAttack3()
-        {
-            Player player = Main.player[NPC.target];
-            AITimer++;
-
-            if (AITimer == 1f)
-            {
-                NPC.Center = player.Center + new Vector2(NPC.ai[2], 0f);
-                NPC.alpha = 255;
-                NPC.velocity = Vector2.Zero;
-                NPC.netUpdate = true;
-            }
-
-            if (AITimer >= 1f && AITimer < 360f)
-            {
-                NPC.alpha = (int)MathHelper.Lerp(255, 140, Math.Min(AITimer / 60f, 1f));
-
-                float verticalOffset = 0f;
-                float yDiff = NPC.Center.Y - player.Center.Y;
-                if (Math.Abs(yDiff) < 20f)
-                    verticalOffset = yDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 40f : -40f) : Math.Sign(yDiff) * 40f;
-
-                Vector2 targetPos = new Vector2(player.Center.X + NPC.ai[2], player.Center.Y + verticalOffset);
-                Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center) * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
-                NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
-
-                // Face toward player based on which side the clone is on
-                int facingDir = NPC.ai[2] > 0f ? -1 : 1; // right side → face left, left side → face right
-                NPC.direction = facingDir;
-                NPC.spriteDirection = facingDir;
-
-                CloneAttack3ShootTimer++;
-                if (CloneAttack3ShootTimer >= 70)
+                // Projectile only spawned server-side
+                if (Main.netMode != NetmodeID.MultiplayerClient)
                 {
-                    CloneAttack3ShootTimer = 0;
+                    Vector2 shootDir = Vector2.Normalize(player.Center - NPC.Center);
+                    Projectile.NewProjectile(
+                        NPC.GetSource_FromAI(),
+                        NPC.Center,
+                        shootDir * 12f,
+                        ModContent.ProjectileType<CycloneProjectile>(),
+                        AllProjectileDamage,
+                        2f,
+                        Main.myPlayer,
+                        ai0: Main.rand.Next(4)
+                    );
+                }
+            }
 
-                    int subAttack = Main.rand.Next(3);
-                    switch (subAttack)
+            return;
+        }
+
+        if (AITimer >= 360f && AITimer < 420f)
+        {
+            NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 360f) / 60f, 1f));
+            NPC.velocity *= 0.9f;
+            return;
+        }
+
+        if (AITimer >= 420f)
+            NPC.active = false;
+    }
+
+    private void DoBehavior_CloneSansWall()
+    {
+        Player player = Main.player[NPC.target];
+        AITimer++;
+
+        if (AITimer == 1f)
+        {
+            NPC.Center = player.Center + new Vector2(NPC.ai[2], 0f);
+            NPC.alpha = 255;
+            NPC.velocity = Vector2.Zero;
+            NPC.netUpdate = true;
+        }
+
+        if (AITimer >= 1f && AITimer < 360f)
+        {
+            NPC.alpha = (int)MathHelper.Lerp(255, 140, Math.Min(AITimer / 60f, 1f));
+
+            float verticalOffset = 0f;
+            float yDiff = NPC.Center.Y - player.Center.Y;
+            if (Math.Abs(yDiff) < 20f)
+                verticalOffset = yDiff == 0f ? (NPC.whoAmI % 2 == 0 ? 40f : -40f) : Math.Sign(yDiff) * 40f;
+
+            Vector2 targetPos = new Vector2(player.Center.X + NPC.ai[2], player.Center.Y + verticalOffset);
+            Vector2 idealVelocity = Vector2.Normalize(targetPos - NPC.Center)
+                * MathHelper.Clamp(Vector2.Distance(NPC.Center, targetPos) / 8f, 2f, 20f);
+            NPC.velocity = Vector2.Lerp(NPC.velocity, idealVelocity, 0.04f);
+
+            int facingDir = NPC.ai[2] > 0f ? -1 : 1;
+            NPC.direction = facingDir;
+            NPC.spriteDirection = facingDir;
+
+            // Deterministic shoot frames: 70, 140, 210, 280, 350
+            bool isShootFrame = AITimer >= 70f && (AITimer - 70f) % 70f == 0f;
+
+            if (isShootFrame)
+            {
+                if (Main.netMode != NetmodeID.MultiplayerClient)
+                {
+                    float shootDirX = NPC.ai[2] > 0f ? -4f : 4f;
+
+                    for (int i = 0; i < 5; i++)
                     {
-                        case 0:
-                            CloneAttack3StartY = player.Center.Y - CloneAttack3Height / 2f;
-                            CloneAttack3EndY = player.Center.Y + CloneAttack3Height / 2f;
-                            break;
-                        case 1:
-                            CloneAttack3StartY = player.Center.Y - CloneAttack3Height;
-                            CloneAttack3EndY = player.Center.Y;
-                            break;
-                        case 2:
-                            CloneAttack3StartY = player.Center.Y;
-                            CloneAttack3EndY = player.Center.Y + CloneAttack3Height;
-                            break;
-                    }
+                        float t = (float)i / 4;
+                        float spawnY = MathHelper.Lerp(
+                            player.Center.Y - CloneAttack3Height / 2f,
+                            player.Center.Y + CloneAttack3Height / 2f,
+                            t
+                        );
 
-                    if (Main.netMode != NetmodeID.MultiplayerClient)
-                    {
-                        // Fire toward player: if clone is on the right, shoot left (-1); if on the left, shoot right (+1)
-                        float shootDirX = NPC.ai[2] > 0f ? -4f : 4f;
+                        
 
-                        for (int i = 0; i < 5; i++)
-                        {
-                            float t = (float)i / 4;
-                            float spawnY = MathHelper.Lerp(CloneAttack3StartY, CloneAttack3EndY, t);
-
-                            SoundEngine.PlaySound(ProjectileSound, NPC.Center);
-
-                            Projectile.NewProjectile(NPC.GetSource_FromAI(),
-                                new Vector2(NPC.Center.X, spawnY),
-                                new Vector2(shootDirX, 0f),
-                                ModContent.ProjectileType<CycloneProjectile>(),
-                                AllProjectileDamage,
-                                2f,
-                                Main.myPlayer,
-                                ai0: Main.rand.Next(4),
-                                ai1: 1f);
-                        }
+                        Projectile.NewProjectile(
+                            NPC.GetSource_FromAI(),
+                            new Vector2(NPC.Center.X, spawnY),
+                            new Vector2(shootDirX, 0f),
+                            ModContent.ProjectileType<CycloneProjectile>(),
+                            AllProjectileDamage,
+                            2f,
+                            Main.myPlayer,
+                            ai0: Main.rand.Next(4),
+                            ai1: 1f
+                        );
                     }
                 }
 
-                return;
+                SoundEngine.PlaySound(ProjectileSound, NPC.Center);
             }
 
-            if (AITimer >= 360f && AITimer < 420f)
-            {
-                NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 360f) / 60f, 1f));
-                NPC.velocity *= 0.9f;
-                return;
-            }
-
-            if (AITimer >= 420f)
-                NPC.active = false;
+            return;
         }
 
+        if (AITimer >= 360f && AITimer < 420f)
+        {
+            NPC.alpha = (int)MathHelper.Lerp(140, 255, Math.Min((AITimer - 360f) / 60f, 1f));
+            NPC.velocity *= 0.9f;
+            return;
+        }
 
-
-
-
-
+        if (AITimer >= 420f)
+            NPC.active = false;
+    }
     }
 
 
