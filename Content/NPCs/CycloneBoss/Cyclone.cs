@@ -357,7 +357,7 @@ public override bool CheckDead()
     return false; // block actual death
 }
 
-        private void DoBehavior_DeathAnimation()
+ private void DoBehavior_DeathAnimation()
 {
     AITimer++;
     NPC.velocity = Vector2.Zero;
@@ -367,128 +367,150 @@ public override bool CheckDead()
     if (AITimer == 1f && Main.netMode != NetmodeID.Server)
         BossCameraSystem.StartBossPan(NPC.Center, panDuration: 30, holdDuration: 300);
 
-    // Phase 1 (0-60): Float upward slowly
+    if (AITimer <= 30f)
+    {
+        NPC.alpha = (int)MathHelper.Lerp(NPC.alpha, 0, AITimer / 30f);
+        return;
+    }
+
+    // Phase 1 (0-60): Slow ascent with rumble — no longer floats cleanly, starts shaking
     if (AITimer <= 60f)
     {
-        NPC.velocity = new Vector2(0f, -1.5f);
-        // White glow pulse using NPC color tint
-        float glowStrength = AITimer / 60f;
-        NPC.color = Color.Lerp(Color.Transparent, Color.White, glowStrength * 0.6f);
+        float shake = (AITimer / 60f) * 2f;
+        NPC.velocity = new Vector2(Main.rand.NextFloat(-shake, shake), -0.8f);
+        NPC.color = Color.Lerp(Color.Transparent, new Color(180, 160, 140), AITimer / 60f * 0.4f);
+
+        // Occasional rock chip dust as it starts crumbling
+        if (Main.netMode != NetmodeID.Server && AITimer % 12 == 0)
+            SpawnRockChipDust(0.2f);
+
         return;
     }
 
-    // Phase 2 (60-150): Cracking/flashing - rapid white flash pulses + dust lines
+    // Phase 2 (60-150): Cracking — rock chunks fly off, seismic rumbles, cracks appear
     if (AITimer <= 150f)
     {
-        NPC.velocity = new Vector2(0f, -0.5f); // slow float
-
-        // Flickering white overlay - pulses faster as it progresses
         float progress = (AITimer - 60f) / 90f;
-        float flickerSpeed = MathHelper.Lerp(8f, 2f, progress); // gets faster
+
+        // Violent shaking increases
+        float shake = MathHelper.Lerp(2f, 6f, progress);
+        NPC.velocity = new Vector2(Main.rand.NextFloat(-shake, shake), Main.rand.NextFloat(-shake * 0.5f, shake * 0.5f));
+
+        // Rocky brown/grey flicker instead of electric blue
+        float flickerSpeed = MathHelper.Lerp(8f, 2f, progress);
         NPC.color = (AITimer % flickerSpeed < flickerSpeed / 2f)
-            ? Color.Lerp(Color.White, new Color(200, 200, 255), progress)
+            ? Color.Lerp(new Color(180, 140, 100), new Color(220, 200, 170), progress)
             : Color.Transparent;
-
-        // Spawn "crack" dust lines radiating outward
-        if (Main.netMode != NetmodeID.Server && AITimer % 8 == 0)
-        {
-            SpawnCrackEffect(progress);
-        }
-
-        // Camera shake that builds
-        if (Main.netMode != NetmodeID.Server && AITimer % 15 == 0)
-            BossCameraSystem.TriggerShake(progress * 8f);
-
-        return;
-    }
-
-    // Phase 3 (150-160): Freeze, full white, big shake
-    if (AITimer <= 160f)
-    {
-        NPC.velocity = Vector2.Zero;
-        NPC.color = Color.White;
-        NPC.alpha = 0;
-
-        if (AITimer == 151f && Main.netMode != NetmodeID.Server)
-            BossCameraSystem.TriggerShake(20f);
-        return;
-    }
-
-    // Phase 4 (160): EXPLODE - spawn burst dust, gore, screen flash
-    if (AITimer == 161f)
-    {
-        SoundEngine.PlaySound(CycloneRoarGor, NPC.Center);
 
         if (Main.netMode != NetmodeID.Server)
         {
-            BossCameraSystem.TriggerShake(30f);
-            SpawnExplosionEffect();
+            // Flying rock chips on every crack pulse
+            if (AITimer % 10 == 0)
+                SpawnRockChipDust(progress);
+
+            // Larger rock shards every ~20 ticks
+            if (AITimer % 20 == 0)
+                SpawnRockShard(progress);
+
+            // Ground dust plume below
+            if (AITimer % 15 == 0)
+                SpawnGroundDust();
         }
+
+        // Camera shakes like a quake — builds heavily
+        if (Main.netMode != NetmodeID.Server && AITimer % 10 == 0)
+            BossCameraSystem.TriggerShake(progress * 12f);
+
         return;
     }
 
-    // Phase 5 (161-200): Fade out NPC after explosion
-    if (AITimer <= 200f)
+    // Phase 3 (150-160): Total freeze — ghostly still before the break
+    if (AITimer <= 160f)
     {
-        NPC.alpha = (int)MathHelper.Lerp(0, 255, (AITimer - 161f) / 39f);
+        NPC.velocity = Vector2.Zero;
+        NPC.color = new Color(200, 170, 130); // pale sandstone
+        NPC.alpha = 0;
+
+        if (AITimer == 151f && Main.netMode != NetmodeID.Server)
+            BossCameraSystem.TriggerShake(25f);
         return;
     }
 
-    // Done - let it actually die
-    if (AITimer >= 200f)
+    // Phase 4 (161): SHATTER — rock explosion, dust column, ground impact
+    if (AITimer >= 161f)
     {
-        _deathAnimationStarted = true; // already true, but safety
+
+        if (Main.netMode != NetmodeID.Server)
+        {
+            BossCameraSystem.TriggerShake(35f);
+        }
+        _deathAnimationStarted = true;
         NPC.life = 0;
-        NPC.HitEffect(); // trigger gore
+        NPC.HitEffect();
         NPC.active = false;
     }
+
 }
 
-
-private void SpawnCrackEffect(float progress)
+private void SpawnRockChipDust(float progress)
 {
-    int dustCount = Main.rand.Next(2, 5);
-    for (int i = 0; i < dustCount; i++)
+    int count = Main.rand.Next(2, 6);
+    for (int i = 0; i < count; i++)
     {
         float angle = Main.rand.NextFloat(MathHelper.TwoPi);
-        float speed = MathHelper.Lerp(2f, 6f, progress);
+        float speed = MathHelper.Lerp(1.5f, 5f, progress);
         Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed;
 
-        // White/light blue dust for crack lines
-        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Electric, vel.X, vel.Y);
-        d.color = Color.Lerp(Color.White, new Color(180, 200, 255), progress);
-        d.noGravity = true;
-        d.scale = MathHelper.Lerp(1.5f, 3f, progress);
-        d.fadeIn = 0.5f;
-    }
-}
-
-private void SpawnExplosionEffect()
-{
-    // Big radial burst
-    for (int i = 0; i < 40; i++)
-    {
-        float angle = MathHelper.TwoPi * i / 40f;
-        float speed = Main.rand.NextFloat(4f, 14f);
-        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed;
-
-        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Electric, vel.X, vel.Y);
-        d.color = Color.White;
-        d.noGravity = true;
-        d.scale = Main.rand.NextFloat(2f, 4f);
-        d.fadeIn = 1f;
-    }
-
-    // Some colored sparks
-    for (int i = 0; i < 20; i++)
-    {
-        float angle = Main.rand.NextFloat(MathHelper.TwoPi);
-        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * Main.rand.NextFloat(3f, 10f);
-        Dust d = Dust.NewDustDirect(NPC.Center, 0, 0, DustID.Torch, vel.X, vel.Y);
+        // Rocky brown/grey dust — DustID.Stone or Dirt instead of Electric
+        Dust d = Dust.NewDustDirect(
+            NPC.Center + Main.rand.NextVector2Circular(30f, 30f),
+            0, 0,
+            DustID.Stone,
+            vel.X, vel.Y
+        );
         d.noGravity = false;
-        d.scale = 2f;
+        d.scale = MathHelper.Lerp(0.8f, 2f, progress);
     }
 }
+
+private void SpawnRockShard(float progress)
+{
+    // A few larger, slower pieces that arc out and fall with gravity
+    for (int i = 0; i < Main.rand.Next(2, 4); i++)
+    {
+        float angle = Main.rand.NextFloat(-MathHelper.Pi, 0f); // mostly upward arc
+        float speed = MathHelper.Lerp(3f, 8f, progress);
+        Vector2 vel = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * speed;
+
+        Dust d = Dust.NewDustDirect(
+            NPC.Center + Main.rand.NextVector2Circular(20f, 20f),
+            0, 0,
+            DustID.Stone,
+            vel.X, vel.Y
+        );
+        d.noGravity = false;
+        d.scale = MathHelper.Lerp(1.5f, 3.5f, Main.rand.NextFloat());
+    }
+}
+
+private void SpawnGroundDust()
+{
+    // Dust billowing downward/outward from the boss base, like it's grinding stone
+    for (int i = 0; i < 3; i++)
+    {
+        float xSpread = Main.rand.NextFloat(-60f, 60f);
+        Vector2 spawnPos = new Vector2(NPC.Center.X + xSpread, NPC.Bottom.Y);
+        Vector2 vel = new Vector2(xSpread * 0.05f, Main.rand.NextFloat(-1f, 0.5f));
+
+        Dust d = Dust.NewDustDirect(spawnPos, 0, 0, DustID.TintableDust, vel.X, vel.Y);
+        d.noGravity = true;
+        d.scale = Main.rand.NextFloat(1f, 2.5f);
+        d.fadeIn = 0.8f;
+    }
+}
+
+
+
         private void DoBehavior_SpawnAnimation()
         {
 
@@ -550,7 +572,7 @@ private void SpawnExplosionEffect()
                     {
                         nextAttack = ActionState.FinalTurn;
                     }
-                    else if (LifeRatio > 0.7f)
+                    else if (LifeRatio > 0.84f)
                     {
                         nextAttack = Main.rand.Next(4) switch
                         {
@@ -562,12 +584,13 @@ private void SpawnExplosionEffect()
                     }
                     else if (LifeRatio > 0.4)
                     {
-                        nextAttack = Main.rand.Next(5) switch
+                        nextAttack = Main.rand.Next(6) switch
                         {
                             0 => ActionState.CircleAndShoot,
                             1 => ActionState.SansWall,
                             2 => ActionState.GroundSmash,
                             3 => ActionState.LingeringRocks,
+                            4 => ActionState.TripleDashAttack,
                             _ => ActionState.MiniCyclones,
                         };
                     }
@@ -777,9 +800,7 @@ private void SpawnExplosionEffect()
             {
                 SoundEngine.PlaySound(CycloneRoarDrag, NPC.Center);
                 TriggerSpin(30);
-
-                if (Main.netMode != NetmodeID.Server)
-                    BossCameraSystem.TriggerShake(10f); // increase for stronger shake
+                BossCameraSystem.TriggerShake(10f); // increase for stronger shake
                 ShootLingeringRockProjectiles();
             }
 
