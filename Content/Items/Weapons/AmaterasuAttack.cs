@@ -53,7 +53,7 @@ public class AmaterasuIdle : ModProjectile
 
             // Idle animation
             Projectile.frameCounter++;
-            if (Projectile.frameCounter >= 3)
+            if (Projectile.frameCounter >= 4)
             {
                 Projectile.frame++;
                 Projectile.frameCounter = 0;
@@ -145,14 +145,14 @@ public class AmaterasuIdle : ModProjectile
     {
         Projectile.timeLeft = 2; // keeps it alive while holding button
     }
-    else if (Projectile.frame >= 12)
+    else if (Projectile.frame >= 8)
     {
         spawnAmaterasuEnd();
     }
 
     // Animation control
     Projectile.frameCounter++;
-    if (Projectile.frameCounter >= 3)
+    if (Projectile.frameCounter >= 4)
     {
         Projectile.frameCounter = 0;
         Projectile.frame++;
@@ -326,7 +326,7 @@ public class AmaterasuEnd : ModProjectile
         }
         // Animation control
         Projectile.frameCounter++;
-        if (Projectile.frameCounter >= 3)
+        if (Projectile.frameCounter >= 4)
         {
             Projectile.frameCounter = 0;
             Projectile.frame++;

@@ -55,26 +55,34 @@ namespace TheBattleCats.Content.Items.Weapons
     }
 
     // Optional: Custom drawing to stretch laser texture along the line
-    public override bool PreDraw(ref Color lightColor)
+  public override bool PreDraw(ref Color lightColor)
+{
+    Texture2D head = ModContent.Request<Texture2D>("TheBattleCats/Content/Items/Weapons/AmaterasuProjectile_Head").Value;
+    Texture2D body = ModContent.Request<Texture2D>("TheBattleCats/Content/Items/Weapons/AmaterasuProjectile_Body").Value;
+    Texture2D tail = ModContent.Request<Texture2D>("TheBattleCats/Content/Items/Weapons/AmaterasuProjectile_Tail").Value;
+
+    float length = Projectile.localAI[0];
+    Vector2 start = Projectile.Center;
+    Vector2 direction = Projectile.velocity.SafeNormalize(Vector2.UnitY);
+    float rotation = direction.ToRotation() - MathHelper.PiOver2;
+    Vector2 origin = new Vector2(body.Width / 2f, 0f);
+
+    // Head
+    Main.spriteBatch.Draw(head, start - Main.screenPosition, null, Color.White, rotation, new Vector2(head.Width / 2f, 0f), 1f, SpriteEffects.None, 0f);
+
+    // Body tiles
+    int bodyTiles = (int)((length - head.Height - tail.Height) / body.Height);
+    for (int i = 0; i < bodyTiles; i++)
     {
-        Texture2D texture = ModContent.Request<Texture2D>("TheBattleCats/Content/Items/Weapons/AmaterasuProjectile").Value;
-
-        float length = Projectile.localAI[0];
-        Vector2 start = Projectile.Center;
-        Vector2 direction = Projectile.velocity;
-        direction.Normalize();
-
-        float rotation = direction.ToRotation() - MathHelper.PiOver2;
-
-        int tileCount = (int)(length / texture.Height);
-
-        for (int i = 0; i < tileCount; i++)
-        {
-            Vector2 drawPos = start + direction * texture.Height * i - Main.screenPosition;
-            Main.spriteBatch.Draw(texture, drawPos, null, Color.White, rotation, new Vector2(texture.Width / 2, 0), 1f, SpriteEffects.None, 0f);
-        }
-
-        return false; // Don't draw default sprite
+        Vector2 bodyPos = start + direction * (head.Height + body.Height * i) - Main.screenPosition;
+        Main.spriteBatch.Draw(body, bodyPos, null, Color.White, rotation, origin, 1f, SpriteEffects.None, 0f);
     }
+
+    // Tail
+    Vector2 tailPos = start + direction * (head.Height + body.Height * bodyTiles) - Main.screenPosition;
+    Main.spriteBatch.Draw(tail, tailPos, null, Color.White, rotation, new Vector2(tail.Width / 2f, 0f), 1f, SpriteEffects.None, 0f);
+
+    return false;
+}
     }
 }

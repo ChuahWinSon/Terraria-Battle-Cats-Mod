@@ -1,39 +1,124 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Terraria;
-using Terraria.ModLoader;
 using Terraria.Audio;
 using Terraria.ID;
+using Terraria.ModLoader;
 
 namespace TheBattleCats.Content.Items.Weapons
 {
+    // ── Shared helpers ────────────────────────────────────────────────────────
+
+    internal static class MusashiHelper
+    {
+        // Offsets & physics
+        public const float IdleHoverY       = -40f;
+        public const float IdleBobAmplitude =   5f;
+        public const float IdleBobSpeed     = 0.05f;
+        public const float SlashKnockback   =  10f;
+        public const float ProjectileSpeed  =  40f;
+        public const int   HitboxOffsetX    = 100;
+        public const int   HitboxOffsetY    = -30;
+
+        /// <summary>
+        /// Returns +1 if the cursor is to the right of the player, -1 otherwise.
+        /// Only valid on the local client — never call this on a remote projectile's AI.
+        /// </summary>
+        public static int DirectionToCursor(Player player)
+            => (Main.MouseWorld.X >= player.Center.X) ? 1 : -1;
+
+        /// <summary>
+        /// Spawns a stationary melee hitbox centred on the player.
+        /// Must only be called by the projectile owner (gate with IsOwner check).
+        /// </summary>
+        public static void SpawnHitbox<T>(Projectile source, Player player, int direction)
+            where T : ModProjectile
+        {
+            Projectile.NewProjectile(
+                source.GetSource_FromThis(),
+                player.Center,
+                Vector2.Zero,
+                ModContent.ProjectileType<T>(),
+                source.damage,
+                SlashKnockback,
+                player.whoAmI,
+                direction   // ai[0] → locked direction
+            );
+        }
+
+        /// <summary>
+        /// Spawns a travelling slash-wave.
+        /// Velocity is computed from the pre-locked direction so all clients agree.
+        /// Must only be called by the projectile owner.
+        /// </summary>
+        public static void SpawnSlashWave(Projectile source, Player player, int direction)
+        {
+            // Use the locked direction rather than live cursor so remote clients see
+            // the same velocity.
+            Vector2 velocity = new Vector2(direction, 0f) * ProjectileSpeed;
+            Projectile.NewProjectile(
+                source.GetSource_FromThis(),
+                player.Center,
+                velocity,
+                ModContent.ProjectileType<MusashiProjectileDone>(),
+                source.damage,
+                SlashKnockback,
+                player.whoAmI,
+                direction   // ai[0] → locked direction (used for sprite flip)
+            );
+        }
+
+        /// <summary>Standard sprite draw for a vertically-stripped spritesheet.</summary>
+        public static void DrawFramed(
+            Projectile proj,
+            Color lightColor,
+            int totalFrames,
+            SpriteEffects effects)
+        {
+            Texture2D texture = Terraria.GameContent.TextureAssets.Projectile[proj.type].Value;
+            int frameHeight = texture.Height / totalFrames;
+
+            Main.spriteBatch.Draw(
+                texture,
+                proj.Center - Main.screenPosition,
+                new Rectangle(0, proj.frame * frameHeight, texture.Width, frameHeight),
+                lightColor,
+                proj.rotation,
+                new Vector2(texture.Width / 2f, frameHeight / 2f),
+                proj.scale,
+                effects,
+                0f
+            );
+        }
+    }
+
+    // ── MusashiIdle ───────────────────────────────────────────────────────────
+
     public class MusashiIdle : ModProjectile
     {
-        private const int totalIdleFrames = 1;
+        private const int TotalFrames   = 1;
+        private const int FrameDuration = 3; // ticks per frame
+        private const int KeepAliveTime = 2;
+
+        public override void SetStaticDefaults()
+        {
+            Main.projFrames[Projectile.type] = TotalFrames;
+        }
 
         public override void SetDefaults()
         {
-            Projectile.width = 60;
-            Projectile.height = 60;
-            Projectile.friendly = false;
-            Projectile.penetrate = -1;
+            Projectile.width       = 60;
+            Projectile.height      = 60;
+            Projectile.friendly    = false;
+            Projectile.penetrate   = -1;
             Projectile.tileCollide = false;
             Projectile.ignoreWater = true;
-            Projectile.timeLeft = 20; // Stay active
+            Projectile.timeLeft    = 20;
         }
 
         public override void AI()
         {
             Player player = Main.player[Projectile.owner];
-            if (player.HeldItem.type == ModContent.ItemType<MusashisKatana>())
-            {
-                Projectile.timeLeft = 2; // keep it alive forever while held
-            }
-            else
-            {
-                Projectile.Kill(); // kill if not holding the item
-            }
-            // Projectile.spriteDirection = player.direction;
 
             if (!player.active || player.dead)
             {
@@ -41,337 +126,204 @@ namespace TheBattleCats.Content.Items.Weapons
                 return;
             }
 
-            // Idle hover around player
-            Vector2 idleOffset = new Vector2(0f, -40f);
-            Projectile.Center = player.Center + idleOffset + new Vector2(0f, (float)System.Math.Sin(Main.GameUpdateCount * 0.05f) * 5f);
-
-            // Idle animation
-            Projectile.frameCounter++;
-            if (Projectile.frameCounter >= 3)
+            if (player.HeldItem.type == ModContent.ItemType<MusashisKatana>())
+                Projectile.timeLeft = KeepAliveTime;
+            else
             {
-                Projectile.frame++;
+                Projectile.Kill();
+                return;
+            }
+
+            // Bob up and down above the player
+            float bob = (float)System.Math.Sin(Main.GameUpdateCount * MusashiHelper.IdleBobSpeed)
+                        * MusashiHelper.IdleBobAmplitude;
+            Projectile.Center = player.Center + new Vector2(0f, MusashiHelper.IdleHoverY + bob);
+
+            // Advance animation
+            if (++Projectile.frameCounter >= FrameDuration)
+            {
                 Projectile.frameCounter = 0;
-                if (Projectile.frame >= totalIdleFrames)
-                {
+                if (++Projectile.frame >= TotalFrames)
                     Projectile.frame = 0;
-                }
             }
         }
 
         public override bool PreDraw(ref Color lightColor)
         {
-            Texture2D texture = Terraria.GameContent.TextureAssets.Projectile[Projectile.type].Value;
-
-            int frameHeight = texture.Height / Main.projFrames[Projectile.type];
-            Rectangle sourceRectangle = new Rectangle(0, Projectile.frame * frameHeight, texture.Width, frameHeight);
-            Vector2 origin = new Vector2(texture.Width / 2f, frameHeight / 2f);
-
-            Main.spriteBatch.Draw(
-                texture,
-                Projectile.Center - Main.screenPosition,
-                sourceRectangle,
-                lightColor,
-                Projectile.rotation,
-                origin,
-                Projectile.scale,
-                Projectile.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None, // Vertical flip for direction
-                0f
-            );
-
+            MusashiHelper.DrawFramed(Projectile, lightColor, TotalFrames, SpriteEffects.None);
             return false;
         }
     }
 
+    // ── MusashiAttack1 ────────────────────────────────────────────────────────
+
     public class MusashiAttack1 : ModProjectile
     {
+        private const int TotalFrames   = 24;
+        private const int HitboxFrame   = 11; // frame on which the hitbox + wave spawn
+        private const int TicksPerFrame = 1;
+
+        // ai[0] stores the attack direction, locked on the first AI tick by the
+        // owner and then read by every client from that point on.
+        private int LockedDirection => (int)Projectile.ai[0];
+
+        public override void SetStaticDefaults()
+        {
+            Main.projFrames[Projectile.type] = TotalFrames;
+        }
+
         public override void SetDefaults()
         {
-            Projectile.width = 60;
-            Projectile.height = 60;
-            Projectile.timeLeft = 24; // Match number of frames (1 frame per tick)
-            Projectile.penetrate = -1;
+            Projectile.width       = 60;
+            Projectile.height      = 60;
+            Projectile.timeLeft    = TotalFrames;
+            Projectile.penetrate   = -1;
             Projectile.tileCollide = false;
             Projectile.ignoreWater = true;
-            Projectile.DamageType = DamageClass.Melee;
-            Projectile.ownerHitCheck = true; // Optional: only hits enemies in front
-            Projectile.friendly = false;
-            Projectile.hostile = false;
+            Projectile.DamageType  = DamageClass.Melee;
+            Projectile.friendly    = false;
+            Projectile.hostile     = false;
         }
 
         public override void AI()
         {
+            Player player = Main.player[Projectile.owner];
 
+            // Lock direction from cursor on the very first tick (owner only).
+            // ai[] fields are automatically synced to other clients by Terraria,
+            // so every client will read the same value from frame 2 onward.
             if (Projectile.frame == 0 && Projectile.frameCounter == 0)
             {
+                if (Projectile.owner == Main.myPlayer)
+                    Projectile.ai[0] = MusashiHelper.DirectionToCursor(player);
+
                 SoundEngine.PlaySound(SoundID.Item1, Projectile.Center);
             }
 
-            Player player = Main.player[Projectile.owner];
+            int direction = LockedDirection;
+            player.direction           = direction;
+            Projectile.direction       = direction;
+            Projectile.spriteDirection = -direction;
+            Projectile.Center          = player.Center;
 
-            // Optional: Stick projectile to player
-            Projectile.Center = player.Center;
+            if (++Projectile.frameCounter < TicksPerFrame)
+                return;
 
-            // Face the same direction as the player
-            Projectile.direction = player.direction;
-            Projectile.spriteDirection = -Projectile.direction;
+            Projectile.frameCounter = 0;
+            Projectile.frame++;
 
-            // Animation control
-            Projectile.frameCounter++;
-            if (Projectile.frameCounter >= 1) // 1 tick per frame
+            // Only the owner spawns child projectiles; Terraria replicates them.
+            if (Projectile.frame == HitboxFrame && Projectile.owner == Main.myPlayer)
             {
-                Projectile.frameCounter = 0;
-                Projectile.frame++;
+                MusashiHelper.SpawnHitbox<MusashiProjectile1>(Projectile, player, direction);
+                MusashiHelper.SpawnSlashWave(Projectile, player, direction);
+            }
 
-                // After 24 frames, spawn MusashiAttack2 and kill this projectile
-
-                if (Projectile.frame == 11 && Projectile.frameCounter == 0)
-                {
-                    SpawnMusashiProjectile();
-                    SpawnMusashiProjectileDone();
-                    
-                }
-
-                if (Projectile.frame >= 24)
-                {
-                    SpawnMusashiAttack2();
-                    Projectile.Kill(); // Kill MusashiAttack1
-                }
+            if (Projectile.frame >= TotalFrames)
+            {
+                if (Projectile.owner == Main.myPlayer)
+                    SpawnAttack2(player, direction);
+                Projectile.Kill();
             }
         }
 
-        private void SpawnMusashiProjectile()
+        private void SpawnAttack2(Player player, int direction)
         {
-            Player player = Main.player[Projectile.owner];
-            Vector2 toCursor = Main.MouseWorld - player.Center;
-            int direction = toCursor.X >= 0 ? 1 : -1;
-
-            // Lock the direction during the entire attack sequence
-            player.direction = direction; // Lock direction during the attack
-
-            // Spawn the hitbox projectile
-            Projectile.NewProjectile(
-            Projectile.GetSource_FromThis(),
-            player.Center,
-            Vector2.Zero, // No velocity, stationary hitbox
-            ModContent.ProjectileType<MusashiProjectile1>(),
-            Projectile.damage, // Set this to your intended damage
-            10f, // Knockback
-            player.whoAmI,
-            direction
-        );
-        }
-
-
-        private void SpawnMusashiProjectileDone()
-        {
-            Player player = Main.player[Projectile.owner];
-            Vector2 toCursor = Main.MouseWorld - player.Center;
-            int direction = toCursor.X >= 0 ? 1 : -1;
-
-            // Lock the direction during the entire attack sequence
-            player.direction = direction; // Lock direction during the attack
-
-            // Spawn the hitbox projectile
-            Projectile.NewProjectile(
-            Projectile.GetSource_FromThis(),
-            player.Center,
-            toCursor.SafeNormalize(Vector2.Zero) * 40f,
-            ModContent.ProjectileType<MusashiProjectileDone>(),
-            Projectile.damage, // Set this to your intended damage
-            10f, // Knockback
-            player.whoAmI,
-            direction
-        );
-        }
-
-
-        private void SpawnMusashiAttack2()
-        {
-            Player player = Main.player[Projectile.owner];
-            Vector2 toCursor = Main.MouseWorld - player.Center;
-            int direction = toCursor.X >= 0 ? 1 : -1;
-
-            // Lock the direction during the entire attack sequence
-            player.direction = direction; // Lock direction during the attack
-
-            // Spawn MusashiAttack2
-            Projectile.NewProjectile(
+            int index = Projectile.NewProjectile(
                 Projectile.GetSource_FromThis(),
                 player.Center,
-                Vector2.Zero, // No velocity, stationary
+                Vector2.Zero,
                 ModContent.ProjectileType<MusashiAttack2>(),
                 Projectile.damage,
                 Projectile.knockBack,
                 player.whoAmI,
-                direction // pass cursor direction into ai[0] for attack direction
+                direction   // ai[0] → locked direction for Attack2
             );
-        }
 
-
-
-
-        public override void SetStaticDefaults()
-        {
-            Main.projFrames[Projectile.type] = 24;
+            // Terraria won't run Attack2's AI until the next tick, so PreDraw
+            // can fire this frame before spriteDirection is set. Prime it now
+            // to prevent a one-frame flicker.
+            if (index >= 0 && index < Main.maxProjectiles)
+                Main.projectile[index].spriteDirection = -direction;
         }
 
         public override bool PreDraw(ref Color lightColor)
         {
-            Texture2D texture = Terraria.GameContent.TextureAssets.Projectile[Projectile.type].Value;
-
-            int frameHeight = texture.Height / Main.projFrames[Projectile.type];
-            Rectangle sourceRectangle = new Rectangle(0, Projectile.frame * frameHeight, texture.Width, frameHeight);
-            Vector2 origin = new Vector2(texture.Width / 2f, frameHeight / 2f);
-
-            Main.spriteBatch.Draw(
-                texture,
-                Projectile.Center - Main.screenPosition,
-                sourceRectangle,
-                lightColor,
-                Projectile.rotation,
-                origin,
-                Projectile.scale,
-                Projectile.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None, // Horizontal flip for direction
-                0f
-            );
-
+            SpriteEffects fx = Projectile.spriteDirection == -1
+                ? SpriteEffects.FlipHorizontally
+                : SpriteEffects.None;
+            MusashiHelper.DrawFramed(Projectile, lightColor, TotalFrames, fx);
             return false;
         }
     }
-    
+
+    // ── MusashiAttack2 ────────────────────────────────────────────────────────
+
     public class MusashiAttack2 : ModProjectile
     {
-        public int totalFrames = 40; // Frames for MusashiAttack2
+        private const int TotalFrames   = 40;
+        private const int HitboxFrame   = 7;  // frame on which the hitbox + wave spawn
+        private const int TicksPerFrame = 1;
 
-        public override void SetDefaults()
-        {
-            Projectile.width = 60;
-            Projectile.height = 60;
-            Projectile.timeLeft = totalFrames; // Duration of MusashiAttack2 animation
-            Projectile.penetrate = -1;
-            Projectile.tileCollide = false;
-            Projectile.ignoreWater = true;
-            Projectile.DamageType = DamageClass.Melee;
-            Projectile.friendly = false;
-            Projectile.hostile = false;
-        }
-
-public override void AI()
-{
-
-
-    if (Projectile.frame == 0 && Projectile.frameCounter == 0)
-    {
-        SoundEngine.PlaySound(SoundID.Item1, Projectile.Center);
-    }
-
-    Player player = Main.player[Projectile.owner];
-
-    // Direction passed in
-    int direction = (int)Projectile.ai[0];  // The locked direction for attack
-
-    // Keep the direction locked during the attack
-    Projectile.direction = direction;
-    Projectile.spriteDirection = -direction;
-
-    // Stick to player and handle animation
-    Projectile.Center = player.Center;
-
-    // Animation frame control
-    Projectile.frameCounter++;
-    if (Projectile.frameCounter >= 1)
-    {
-        Projectile.frameCounter = 0;
-        Projectile.frame++;
-
-        if (Projectile.frame >= totalFrames)
-        {
-            Projectile.Kill(); // Kill after finishing frames
-
-            // Reset player direction if necessary (only after attack sequence)
-            player.direction = direction; // Ensure player remains locked in the correct direction
-        }
-
-        if (Projectile.frame == 7 && Projectile.frameCounter == 0)
-        {
-            SpawnMusashiProjectileDone();
-            SpawnMusashiProjectile();
-        
-        }
-    }
-}
-
-private void SpawnMusashiProjectile()
-{
-    Player player = Main.player[Projectile.owner];
-    Vector2 toCursor = Main.MouseWorld - player.Center;
-    int direction = toCursor.X >= 0 ? 1 : -1;
-
-    // Lock the direction during the entire attack sequence
-    player.direction = direction; // Lock direction during the attack
-
-    // Spawn the hitbox projectile
-    Projectile.NewProjectile(
-    Projectile.GetSource_FromThis(),
-    player.Center,
-    Vector2.Zero, // No velocity, stationary hitbox
-    ModContent.ProjectileType<MusashiProjectile2>(),
-    Projectile.damage, // Set this to your intended damage
-    10f, // Knockback
-    player.whoAmI,
-    direction
-);
-}
-
-private void SpawnMusashiProjectileDone()
-{
-    Player player = Main.player[Projectile.owner];
-    Vector2 toCursor = Main.MouseWorld - player.Center;
-    int direction = toCursor.X >= 0 ? 1 : -1;
-
-    // Lock the direction during the entire attack sequence
-    player.direction = direction; // Lock direction during the attack
-
-    // Spawn the hitbox projectile
-    Projectile.NewProjectile(
-    Projectile.GetSource_FromThis(),
-    player.Center,
-    toCursor.SafeNormalize(Vector2.Zero) * 40f, 
-    ModContent.ProjectileType<MusashiProjectileDone>(),
-    Projectile.damage, // Set this to your intended damage
-    10f, // Knockback
-    player.whoAmI,
-    direction
-);
-}
+        // Direction was locked by Attack1 and passed in via ai[0] at spawn.
+        private int LockedDirection => (int)Projectile.ai[0];
 
         public override void SetStaticDefaults()
         {
-            Main.projFrames[Projectile.type] = totalFrames; // Set the number of frames for MusashiAttack2
+            Main.projFrames[Projectile.type] = TotalFrames;
         }
 
-         public override bool PreDraw(ref Color lightColor)
+        public override void SetDefaults()
         {
-            Texture2D texture = Terraria.GameContent.TextureAssets.Projectile[Projectile.type].Value;
+            Projectile.width       = 60;
+            Projectile.height      = 60;
+            Projectile.timeLeft    = TotalFrames;
+            Projectile.penetrate   = -1;
+            Projectile.tileCollide = false;
+            Projectile.ignoreWater = true;
+            Projectile.DamageType  = DamageClass.Melee;
+            Projectile.friendly    = false;
+            Projectile.hostile     = false;
+        }
 
-            int frameHeight = texture.Height / Main.projFrames[Projectile.type];
-            Rectangle sourceRectangle = new Rectangle(0, Projectile.frame * frameHeight, texture.Width, frameHeight);
-            Vector2 origin = new Vector2(texture.Width / 2f, frameHeight / 2f);
+        public override void AI()
+        {
+            Player player = Main.player[Projectile.owner];
 
-            Main.spriteBatch.Draw(
-                texture,
-                Projectile.Center - Main.screenPosition,
-                sourceRectangle,
-                lightColor,
-                Projectile.rotation,
-                origin,
-                Projectile.scale,
-                Projectile.spriteDirection == -1 ? SpriteEffects.FlipHorizontally : SpriteEffects.None, // Horizontal flip for direction
-                0f
-            );
+            if (Projectile.frame == 0 && Projectile.frameCounter == 0)
+                SoundEngine.PlaySound(SoundID.Item1, Projectile.Center);
 
+            // ai[0] was set at spawn by Attack1 — safe to read on all clients.
+            int direction = LockedDirection;
+            player.direction           = direction;
+            Projectile.direction       = direction;
+            Projectile.spriteDirection = -direction;
+            Projectile.Center          = player.Center;
+
+            if (++Projectile.frameCounter < TicksPerFrame)
+                return;
+
+            Projectile.frameCounter = 0;
+            Projectile.frame++;
+
+            // Only the owner spawns child projectiles; Terraria replicates them.
+            if (Projectile.frame == HitboxFrame && Projectile.owner == Main.myPlayer)
+            {
+                MusashiHelper.SpawnHitbox<MusashiProjectile2>(Projectile, player, direction);
+                MusashiHelper.SpawnSlashWave(Projectile, player, direction);
+            }
+
+            if (Projectile.frame >= TotalFrames)
+                Projectile.Kill();
+        }
+
+        public override bool PreDraw(ref Color lightColor)
+        {
+            SpriteEffects fx = Projectile.spriteDirection == -1
+                ? SpriteEffects.FlipHorizontally
+                : SpriteEffects.None;
+            MusashiHelper.DrawFramed(Projectile, lightColor, TotalFrames, fx);
             return false;
         }
     }
-
 }
