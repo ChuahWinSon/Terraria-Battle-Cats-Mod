@@ -175,6 +175,8 @@ NPCs: {
 	}
 
 	CycloneClone.DisplayName: Cyclone Clone
+	Clionel.DisplayName: Clionel
+	MiniClionel.DisplayName: Mini Clionel
 }
 
 Projectiles: {

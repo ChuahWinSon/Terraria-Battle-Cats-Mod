@@ -63,9 +63,6 @@ namespace TheBattleCats.Content.NPCs.CycloneBoss
             Music = MusicLoader.GetMusicSlot(Mod, "Assets/Music/CycloneBossMusic");
         }
 
-        public bool IsPhase2 => NPC.life <= NPC.lifeMax / 2;
-        private const int CloneOffset = 100; // pixels left/right, tune this
-        private const int CloneAlpha = 200; // transparency, tune this
 
         public const float FinalPhaseLifeRatio = 0.1f;
 
