@@ -140,11 +140,15 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         // TestAnimation behaviour — hover above the player
         // -------------------------------------------------------
+
+        private readonly ClionelGlowEffect _glowEffect = new();
         private void DoBehavior_TestAnimation(Player player)
         {
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
+
+            _glowEffect.Update();
         }
 
         // -------------------------------------------------------
@@ -165,6 +169,12 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 frameTimer = 0;
                 SharedFrame = (SharedFrame + 1) % 15;
             }
+        }
+
+        public override void PostDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
+        {
+            if ((ActionState)AIState == ActionState.TestAnimation)
+                _glowEffect.Draw(spriteBatch, NPC, screenPos, SharedFrame);
         }
 
         // -------------------------------------------------------
