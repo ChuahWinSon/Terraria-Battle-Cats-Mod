@@ -24,6 +24,14 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         private Vector2 currentOffset;
         private bool offsetInitialised = false;
 
+        // Independent frame counter — only used during AttackIndependent
+        private int miniFrame = 0;
+        private int miniFrameTimer = 0;
+        private const int MiniFrameSpeed = 8;
+
+        /// <summary>True for one tick when the independent animation completes a full cycle.</summary>
+        public bool AnimationFinished { get; private set; } = false;
+
         // -------------------------------------------------------
         // SetDefaults / SetStaticDefaults
         // -------------------------------------------------------
@@ -81,7 +89,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             // Snap to base offset on first tick so there's no slide-in from Vector2.Zero
             if (!offsetInitialised)
             {
-                currentOffset    = baseOffset;
+                currentOffset     = baseOffset;
                 offsetInitialised = true;
             }
 
@@ -91,17 +99,22 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             switch (clionel.CurrentMiniBehavior)
             {
                 case Clionel.MiniBehavior.Stay:
+                    miniFrame = 0;
+                    miniFrameTimer = 0;
+                    AnimationFinished = false;
                     DoMiniBehavior_Stay(baseOffset);
                     break;
 
-                case Clionel.MiniBehavior.Orbit:
-                    DoMiniBehavior_Orbit(clionel, baseOffset);
+                case Clionel.MiniBehavior.AttackSynced:
+                    miniFrame = 0;
+                    miniFrameTimer = 0;
+                    AnimationFinished = false;
+                    DoMiniBehavior_AttackSynced(clionel, baseOffset);
                     break;
 
-                // Future behaviors get their own cases here:
-                // case Clionel.MiniBehavior.Scatter:
-                //     DoMiniBehavior_Scatter(clionel, baseOffset, slot);
-                //     break;
+                case Clionel.MiniBehavior.AttackIndependent:
+                    DoMiniBehavior_AttackIndependent(baseOffset);
+                    break;
             }
 
             // Apply position
@@ -110,7 +123,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         }
 
         // -------------------------------------------------------
-        // Stay — lerp smoothly back to the base offset and hold
+        // Stay — lerp smoothly back to base offset, frozen on frame 0
         // -------------------------------------------------------
         private void DoMiniBehavior_Stay(Vector2 baseOffset)
         {
@@ -118,14 +131,14 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         }
 
         // -------------------------------------------------------
-        // Orbit — frame-driven push/pull around the boss
+        // AttackSynced — position AND sprite follow SharedFrame
         //
         //  Frames  0- 2  → pull in  (MiniCloseDistance)
         //  Frames  3- 8  → push out (MiniOuterDistance)
         //  Frames  9-12  → stay out (MiniOuterDistance)
         //  Frames 13-14  → return   (1.0f, original offset)
         // -------------------------------------------------------
-        private void DoMiniBehavior_Orbit(Clionel clionel, Vector2 baseOffset)
+        private void DoMiniBehavior_AttackSynced(Clionel clionel, Vector2 baseOffset)
         {
             int frame = clionel.SharedFrame;
 
@@ -143,7 +156,33 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         }
 
         // -------------------------------------------------------
-        // FindFrame — mirror the boss's SharedFrame exactly
+        // AttackIndependent — minis animate freely, stay at base offset
+        // -------------------------------------------------------
+        private void DoMiniBehavior_AttackIndependent(Vector2 baseOffset)
+        {
+            // Reset the flag — it is only true for one tick when the cycle wraps
+            AnimationFinished = false;
+
+            miniFrameTimer++;
+            if (miniFrameTimer >= MiniFrameSpeed)
+            {
+                miniFrameTimer = 0;
+                miniFrame = (miniFrame + 1) % 15;
+
+                // Just wrapped back to 0 — one full cycle complete
+                if (miniFrame == 0)
+                    AnimationFinished = true;
+            }
+
+            // Position stays at base offset, no push/pull
+            currentOffset = Vector2.Lerp(currentOffset, baseOffset, Clionel.MiniLerpSpeed);
+        }
+
+        // -------------------------------------------------------
+        // FindFrame — pick the right frame source per behavior
+        //   Stay              → frame 0 (SharedFrame is always 0 here)
+        //   AttackSynced      → follow SharedFrame
+        //   AttackIndependent → follow miniFrame
         // -------------------------------------------------------
         public override void FindFrame(int frameHeight)
         {
@@ -154,7 +193,9 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 NPC owner = Main.npc[ownerIdx];
                 if (owner.active && owner.ModNPC is Clionel clionel)
                 {
-                    NPC.frame.Y = clionel.SharedFrame * frameHeight;
+                    NPC.frame.Y = clionel.CurrentMiniBehavior == Clionel.MiniBehavior.AttackIndependent
+                        ? miniFrame * frameHeight
+                        : clionel.SharedFrame * frameHeight;
                     return;
                 }
             }

@@ -19,12 +19,9 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         public enum MiniBehavior
         {
-            Stay,   // minis locked to base offset
-            Orbit,  // frame-driven push/pull animation
-            // Future examples:
-            // Scatter,
-            // SpinAttack,
-            // FormTriangle,
+            Stay,               // minis locked to base offset, frozen on frame 0
+            AttackSynced,       // minis follow SharedFrame for position AND sprite
+            AttackIndependent,  // minis play animation freely, stay at base offset
         }
 
         /// <summary>The current behavior mode the minis should execute.</summary>
@@ -172,7 +169,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_TestAnimation(Player player)
         {
-            CurrentMiniBehavior = MiniBehavior.Orbit;
+            CurrentMiniBehavior = MiniBehavior.AttackSynced;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
@@ -205,7 +202,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_TestAnimationShort(Player player)
         {
-            CurrentMiniBehavior = MiniBehavior.Orbit;
+            CurrentMiniBehavior = MiniBehavior.AttackSynced;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
@@ -240,7 +237,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             if (AITimer >= 300)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.TestAnimation;
+                AIState = (float)ActionState.MiniOnlyAttack;
                 NPC.netUpdate = true;
             }
         }
@@ -250,7 +247,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_MiniOnlyAttack(Player player)
         {
-            CurrentMiniBehavior = MiniBehavior.Orbit; // minis animate, boss doesn't
+            CurrentMiniBehavior = MiniBehavior.AttackIndependent;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
@@ -260,11 +257,21 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             SharedFrame = 0;
             frameTimer = 0;
 
-            AITimer++;
-            if (AITimer >= 300)
+            // Wait for all three minis to finish their animation cycle
+            bool allDone = true;
+            for (int i = 0; i < 3; i++)
             {
-                AITimer = 0f;
-                AIState = (float)ActionState.Idle; // transition to next attack here
+                if (miniWhoAmI[i] >= 0 && miniWhoAmI[i] < Main.maxNPCs)
+                {
+                    NPC mini = Main.npc[miniWhoAmI[i]];
+                    if (mini.active && mini.ModNPC is MiniClionel mc && !mc.AnimationFinished)
+                        allDone = false;
+                }
+            }
+
+            if (allDone)
+            {
+                AIState = (float)ActionState.TestAnimation;
                 NPC.netUpdate = true;
             }
         }
