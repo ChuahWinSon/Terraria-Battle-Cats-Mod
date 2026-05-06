@@ -62,4 +62,41 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 SamplerState.PointClamp, null, null, null, Main.GameViewMatrix.TransformationMatrix);
         }
     }
+
+    // -------------------------------------------------------
+    // Cone telegraph drawn from a mini toward the player
+    // -------------------------------------------------------
+    public class MiniConeEffect
+    {
+        public const int ConeFadeInDuration = 90; // ticks to reach full opacity
+
+        public void Draw(SpriteBatch spriteBatch, NPC mini, Vector2 screenPos, float coneAlpha, Player target)
+        {
+            if (coneAlpha <= 0f)
+                return;
+
+            Texture2D tex = ModContent.Request<Texture2D>(
+                "TheBattleCats/Content/NPCs/ClionelBoss/ClionelCone",
+                AssetRequestMode.ImmediateLoad).Value;
+
+            // Angle from mini center toward the player
+            Vector2 toPlayer = target.Center - mini.Center;
+            float angle = toPlayer.ToRotation() + MathHelper.Pi;
+
+            float drawOffset = 20f; // adjust this to push the cone further out
+            Vector2 drawPos = mini.Center - screenPos + Vector2.Normalize(toPlayer) * drawOffset;
+
+            spriteBatch.Draw(
+                tex,
+                drawPos,
+                null,
+                Color.White * coneAlpha,
+                angle,
+                new Vector2(tex.Width, tex.Height / 2f), // origin at right center, tip points toward player
+                1f,
+                SpriteEffects.None,
+                0f
+            );
+        }
+    }
 }
