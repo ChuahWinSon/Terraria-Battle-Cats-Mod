@@ -24,7 +24,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         private Vector2 currentOffset;
         private bool offsetInitialised = false;
 
-        // Independent frame counter — only used during AttackIndependent
+        // Independent frame counter — used during AttackIndependent and AttackOneByOne
         private int miniFrame = 0;
         private int miniFrameTimer = 0;
         private const int MiniFrameSpeed = 8;
@@ -115,6 +115,19 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 case Clionel.MiniBehavior.AttackIndependent:
                     DoMiniBehavior_AttackIndependent(baseOffset);
                     break;
+
+                case Clionel.MiniBehavior.AttackOneByOne:
+                    // Only the active slot animates, others stay
+                    if (slot == clionel.ActiveMiniSlot)
+                        DoMiniBehavior_AttackIndependent(baseOffset);
+                    else
+                    {
+                        miniFrame = 0;
+                        miniFrameTimer = 0;
+                        AnimationFinished = false;
+                        DoMiniBehavior_Stay(baseOffset);
+                    }
+                    break;
             }
 
             // Apply position
@@ -157,6 +170,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
         // -------------------------------------------------------
         // AttackIndependent — minis animate freely, stay at base offset
+        // Also reused by AttackOneByOne for the active slot
         // -------------------------------------------------------
         private void DoMiniBehavior_AttackIndependent(Vector2 baseOffset)
         {
@@ -180,9 +194,10 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
         // -------------------------------------------------------
         // FindFrame — pick the right frame source per behavior
-        //   Stay              → frame 0 (SharedFrame is always 0 here)
-        //   AttackSynced      → follow SharedFrame
-        //   AttackIndependent → follow miniFrame
+        //   Stay                → frame 0 (SharedFrame is always 0 here)
+        //   AttackSynced        → follow SharedFrame
+        //   AttackIndependent   → follow miniFrame
+        //   AttackOneByOne      → active slot follows miniFrame, others frame 0
         // -------------------------------------------------------
         public override void FindFrame(int frameHeight)
         {
@@ -193,7 +208,12 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 NPC owner = Main.npc[ownerIdx];
                 if (owner.active && owner.ModNPC is Clionel clionel)
                 {
-                    NPC.frame.Y = clionel.CurrentMiniBehavior == Clionel.MiniBehavior.AttackIndependent
+                    bool usesMiniFrame =
+                        clionel.CurrentMiniBehavior == Clionel.MiniBehavior.AttackIndependent ||
+                        (clionel.CurrentMiniBehavior == Clionel.MiniBehavior.AttackOneByOne &&
+                         (int)SlotIndex == clionel.ActiveMiniSlot);
+
+                    NPC.frame.Y = usesMiniFrame
                         ? miniFrame * frameHeight
                         : clionel.SharedFrame * frameHeight;
                     return;

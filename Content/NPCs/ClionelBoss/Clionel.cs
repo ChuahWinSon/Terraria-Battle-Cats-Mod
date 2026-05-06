@@ -22,10 +22,14 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             Stay,               // minis locked to base offset, frozen on frame 0
             AttackSynced,       // minis follow SharedFrame for position AND sprite
             AttackIndependent,  // minis play animation freely, stay at base offset
+            AttackOneByOne,     // minis animate one at a time in slot order
         }
 
         /// <summary>The current behavior mode the minis should execute.</summary>
         public MiniBehavior CurrentMiniBehavior { get; private set; } = MiniBehavior.Stay;
+
+        /// <summary>Which mini slot is currently animating during AttackOneByOne.</summary>
+        public int ActiveMiniSlot { get; private set; } = 0;
 
         private enum ActionState
         {
@@ -33,6 +37,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             TestAnimationShort,
             Idle,
             MiniOnlyAttack,
+            OneByOne,
             Spawn,
             Reset,
             Death
@@ -135,6 +140,9 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 case ActionState.MiniOnlyAttack:
                     DoBehavior_MiniOnlyAttack(player);
                     break;
+                case ActionState.OneByOne:
+                    DoBehavior_OneByOne(player);
+                    break;
                 case ActionState.Reset:
                     DoBehavior_ResetAI();
                     break;
@@ -148,6 +156,51 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
             // Advance the shared animation frame every tick
             AdvanceSharedFrame((ActionState)AIState);
+        }
+
+
+                // -------------------------------------------------------
+        // Behavior: Reset
+        // -------------------------------------------------------
+        private ActionState previousAttack = ActionState.Reset;
+
+        private void DoBehavior_ResetAI()
+        {
+            CurrentMiniBehavior = MiniBehavior.Stay;
+
+            AttackTimer = 0f;
+            AITimer     = 0f;
+            ExtraTimer  = 0f;
+
+            NPC.TargetClosest(false);
+            NPC.velocity *= 0.95f;
+
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+
+                ActionState nextAttack;
+                do
+                {
+
+                    nextAttack = Main.rand.Next(5) switch
+                    {
+                        0 => ActionState.TestAnimation,
+                        1 => ActionState.TestAnimationShort,
+                        2 => ActionState.Idle,
+                        3 => ActionState.MiniOnlyAttack,
+                        _ => ActionState.OneByOne,
+                    };
+                }
+
+                while (nextAttack == previousAttack);
+
+                // ActionState nextAttack = ActionState.TestAnimation; // testing
+
+                previousAttack = nextAttack;
+                AIState        = (float)nextAttack;
+                AITimer        = 0f;
+                NPC.netUpdate  = true;
+            }
         }
 
         // -------------------------------------------------------
@@ -190,7 +243,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
             if (SharedFrame == 14 && frameTimer == FrameSpeed - 1)
             {
-                AIState = (float)ActionState.TestAnimationShort;
+                AIState = (float)ActionState.Reset;
                 SharedFrame = 0;
                 frameTimer = 0;
                 NPC.netUpdate = true;
@@ -212,7 +265,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
             if (SharedFrame == 14 && frameTimer == FrameSpeed - 1)
             {
-                AIState = (float)ActionState.Idle;
+                AIState = (float)ActionState.Reset;
                 SharedFrame = 0;
                 frameTimer = 0;
                 NPC.netUpdate = true;
@@ -237,7 +290,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             if (AITimer >= 300)
             {
                 AITimer = 0f;
-                AIState = (float)ActionState.MiniOnlyAttack;
+                AIState = (float)ActionState.Reset;
                 NPC.netUpdate = true;
             }
         }
@@ -253,7 +306,6 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
-            // Boss stays frozen on frame 0
             SharedFrame = 0;
             frameTimer = 0;
 
@@ -271,37 +323,48 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
             if (allDone)
             {
-                AIState = (float)ActionState.TestAnimation;
+                AIState = (float)ActionState.Reset;
                 NPC.netUpdate = true;
             }
         }
 
         // -------------------------------------------------------
-        // Behavior: Reset
+        // Behavior: OneByOne
         // -------------------------------------------------------
-        private ActionState previousAttack = ActionState.Reset;
-
-        private void DoBehavior_ResetAI()
+        private void DoBehavior_OneByOne(Player player)
         {
-            CurrentMiniBehavior = MiniBehavior.Stay;
+            CurrentMiniBehavior = MiniBehavior.AttackOneByOne;
 
-            AttackTimer = 0f;
-            AITimer     = 0f;
-            ExtraTimer  = 0f;
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
+            Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+            NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
-            NPC.TargetClosest(false);
-            NPC.velocity *= 0.95f;
+            SharedFrame = 0;
+            frameTimer = 0;
 
-            if (Main.netMode != NetmodeID.MultiplayerClient)
+            // Check if the currently active mini has finished its animation
+            if (ActiveMiniSlot < 3 &&
+                miniWhoAmI[ActiveMiniSlot] >= 0 &&
+                miniWhoAmI[ActiveMiniSlot] < Main.maxNPCs)
             {
-                ActionState nextAttack = ActionState.TestAnimation; // testing
+                NPC mini = Main.npc[miniWhoAmI[ActiveMiniSlot]];
+                if (mini.active && mini.ModNPC is MiniClionel mc && mc.AnimationFinished)
+                {
+                    ActiveMiniSlot++;
+                    NPC.netUpdate = true;
+                }
+            }
 
-                previousAttack = nextAttack;
-                AIState        = (float)nextAttack;
-                AITimer        = 0f;
-                NPC.netUpdate  = true;
+            // All three done — reset and transition to Idle
+            if (ActiveMiniSlot >= 3)
+            {
+                ActiveMiniSlot = 0;
+                AIState = (float)ActionState.Reset;
+                NPC.netUpdate = true;
             }
         }
+
+
 
         // -------------------------------------------------------
         // Placeholder stubs
