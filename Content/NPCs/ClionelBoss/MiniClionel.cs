@@ -51,7 +51,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         }
 
         // -------------------------------------------------------
-        // Main AI — follow the boss with animated offset
+        // Main AI — execute whatever behavior the boss declares
         // -------------------------------------------------------
         public override void AI()
         {
@@ -78,42 +78,68 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
             NPC.spriteDirection = owner.spriteDirection;
 
-            // On first tick, snap directly to the base offset so there's no
-            // slide-in from Vector2.Zero on spawn
+            // Snap to base offset on first tick so there's no slide-in from Vector2.Zero
             if (!offsetInitialised)
             {
-                currentOffset = baseOffset;
+                currentOffset    = baseOffset;
                 offsetInitialised = true;
             }
 
             // --------------------------------------------------
-            // Work out the target offset scale based on SharedFrame
-            //
-            //  Frames  0- 2  → pull in  (MiniCloseDistance)
-            //  Frames  3- 8  → push out (MiniOuterDistance)
-            //  Frames  9-12  → stay out (MiniOuterDistance)
-            //  Frames 13-14  → return   (1.0f, original offset)
+            // Dispatch to the correct movement mode
             // --------------------------------------------------
-            float targetScale;
+            switch (clionel.CurrentMiniBehavior)
+            {
+                case Clionel.MiniBehavior.Stay:
+                    DoMiniBehavior_Stay(baseOffset);
+                    break;
+
+                case Clionel.MiniBehavior.Orbit:
+                    DoMiniBehavior_Orbit(clionel, baseOffset);
+                    break;
+
+                // Future behaviors get their own cases here:
+                // case Clionel.MiniBehavior.Scatter:
+                //     DoMiniBehavior_Scatter(clionel, baseOffset, slot);
+                //     break;
+            }
+
+            // Apply position
+            NPC.Center   = owner.Center + currentOffset;
+            NPC.velocity = Vector2.Zero;
+        }
+
+        // -------------------------------------------------------
+        // Stay — lerp smoothly back to the base offset and hold
+        // -------------------------------------------------------
+        private void DoMiniBehavior_Stay(Vector2 baseOffset)
+        {
+            currentOffset = Vector2.Lerp(currentOffset, baseOffset, Clionel.MiniLerpSpeed);
+        }
+
+        // -------------------------------------------------------
+        // Orbit — frame-driven push/pull around the boss
+        //
+        //  Frames  0- 2  → pull in  (MiniCloseDistance)
+        //  Frames  3- 8  → push out (MiniOuterDistance)
+        //  Frames  9-12  → stay out (MiniOuterDistance)
+        //  Frames 13-14  → return   (1.0f, original offset)
+        // -------------------------------------------------------
+        private void DoMiniBehavior_Orbit(Clionel clionel, Vector2 baseOffset)
+        {
             int frame = clionel.SharedFrame;
 
+            float targetScale;
             if (frame <= 2)
                 targetScale = Clionel.MiniCloseDistance;
-            else if (frame <= 7)
+            else if (frame <= 8)
                 targetScale = Clionel.MiniOuterDistance;
             else if (frame <= 12)
                 targetScale = Clionel.MiniOuterDistance;
             else
                 targetScale = 1.0f;
 
-            Vector2 targetOffset = baseOffset * targetScale;
-
-            // Smooth lerp toward the target offset
-            currentOffset = Vector2.Lerp(currentOffset, targetOffset, Clionel.MiniLerpSpeed);
-
-            // Apply position
-            NPC.Center = owner.Center + currentOffset;
-            NPC.velocity = Vector2.Zero;
+            currentOffset = Vector2.Lerp(currentOffset, baseOffset * targetScale, Clionel.MiniLerpSpeed);
         }
 
         // -------------------------------------------------------
@@ -133,7 +159,6 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 }
             }
 
-            // Fallback: frame 0
             NPC.frame.Y = 0;
         }
 

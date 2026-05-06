@@ -14,18 +14,37 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
     [AutoloadBossHead]
     public class Clionel : ModNPC
     {
+        // -------------------------------------------------------
+        // Mini behavior modes — add new entries here for new attacks
+        // -------------------------------------------------------
+        public enum MiniBehavior
+        {
+            Stay,   // minis locked to base offset
+            Orbit,  // frame-driven push/pull animation
+            // Future examples:
+            // Scatter,
+            // SpinAttack,
+            // FormTriangle,
+        }
+
+        /// <summary>The current behavior mode the minis should execute.</summary>
+        public MiniBehavior CurrentMiniBehavior { get; private set; } = MiniBehavior.Stay;
+
         private enum ActionState
         {
             TestAnimation,
+            TestAnimationShort,
+            Idle,
+            MiniOnlyAttack,
             Spawn,
             Reset,
             Death
         }
 
-        public ref float AIState => ref NPC.ai[0];
-        public ref float AITimer => ref NPC.ai[1];
+        public ref float AIState     => ref NPC.ai[0];
+        public ref float AITimer     => ref NPC.ai[1];
         public ref float AttackTimer => ref NPC.ai[2];
-        public ref float ExtraTimer => ref NPC.ai[3];
+        public ref float ExtraTimer  => ref NPC.ai[3];
 
         public static int AllProjectileDamage => 20;
 
@@ -44,18 +63,6 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             new Vector2( 100f, -90f),   // [1] Top-right
             new Vector2( 100f,  90f),   // [2] Bottom-right
         };
-
-        // -------------------------------------------------------
-        // Mini animation constants — tweak these to adjust feel
-        // -------------------------------------------------------
-        /// <summary>How close the minis pull in during frames 0-2 (fraction of original offset).</summary>
-        public const float MiniCloseDistance = 0.5f;
-
-        /// <summary>How far the minis push out during frames 3-8 (fraction of original offset).</summary>
-        public const float MiniOuterDistance = 1.5f;
-
-        /// <summary>Lerp speed for mini position interpolation. Higher = snappier (0.0-1.0).</summary>
-        public const float MiniLerpSpeed = 0.06f;
 
         // -------------------------------------------------------
         // Shared animation frame (written here, read by minis)
@@ -83,8 +90,8 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             NPC.knockBackResist = 0f;
             NPC.noGravity = true;
             NPC.noTileCollide = true;
-            NPC.width = 110;
-            NPC.height = 110;
+            NPC.width = 60;
+            NPC.height = 150;
             NPC.boss = true;
             Music = MusicLoader.GetMusicSlot(Mod, "Assets/Music/CycloneBossMusic");
         }
@@ -122,6 +129,15 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 case ActionState.TestAnimation:
                     DoBehavior_TestAnimation(player);
                     break;
+                case ActionState.TestAnimationShort:
+                    DoBehavior_TestAnimationShort(player);
+                    break;
+                case ActionState.Idle:
+                    DoBehavior_Idle(player);
+                    break;
+                case ActionState.MiniOnlyAttack:
+                    DoBehavior_MiniOnlyAttack(player);
+                    break;
                 case ActionState.Reset:
                     DoBehavior_ResetAI();
                     break;
@@ -134,47 +150,177 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             }
 
             // Advance the shared animation frame every tick
-            AdvanceSharedFrame();
+            AdvanceSharedFrame((ActionState)AIState);
         }
 
         // -------------------------------------------------------
-        // TestAnimation behaviour — hover above the player
+        // Mini orbit distance / lerp constants
         // -------------------------------------------------------
+        /// <summary>How close the minis pull in during frames 0-2 (fraction of original offset).</summary>
+        public const float MiniCloseDistance = 0.5f;
+
+        /// <summary>How far the minis push out during frames 3-8 (fraction of original offset).</summary>
+        public const float MiniOuterDistance = 1.5f;
+
+        /// <summary>Lerp speed for mini position interpolation. Higher = snappier (0.0-1.0).</summary>
+        public const float MiniLerpSpeed = 0.06f;
 
         private readonly ClionelGlowEffect _glowEffect = new();
+
+        // -------------------------------------------------------
+        // Behavior: TestAnimation
+        // -------------------------------------------------------
         private void DoBehavior_TestAnimation(Player player)
         {
+            CurrentMiniBehavior = MiniBehavior.Orbit;
+
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
             _glowEffect.Update();
+
+            if (SharedFrame == 8)
+            {
+                AttackTimer++;
+                if (AttackTimer >= 120)
+                {
+                    AttackTimer = 0f;
+                    SharedFrame = 9;
+                    NPC.netUpdate = true;
+                }
+            }
+
+            if (SharedFrame == 14 && frameTimer == FrameSpeed - 1)
+            {
+                AIState = (float)ActionState.TestAnimationShort;
+                SharedFrame = 0;
+                frameTimer = 0;
+                NPC.netUpdate = true;
+            }
+        }
+
+        // -------------------------------------------------------
+        // Behavior: TestAnimationShort
+        // -------------------------------------------------------
+        private void DoBehavior_TestAnimationShort(Player player)
+        {
+            CurrentMiniBehavior = MiniBehavior.Orbit;
+
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
+            Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+            NPC.velocity = (targetPos - NPC.Center) * 0.06f;
+
+            _glowEffect.Update();
+
+            if (SharedFrame == 14 && frameTimer == FrameSpeed - 1)
+            {
+                AIState = (float)ActionState.Idle;
+                SharedFrame = 0;
+                frameTimer = 0;
+                NPC.netUpdate = true;
+            }
+        }
+
+        // -------------------------------------------------------
+        // Behavior: Idle
+        // -------------------------------------------------------
+        private void DoBehavior_Idle(Player player)
+        {
+            CurrentMiniBehavior = MiniBehavior.Stay;
+
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
+            Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+            NPC.velocity = (targetPos - NPC.Center) * 0.06f;
+
+            SharedFrame = 0;
+            frameTimer = 0;
+
+            AITimer++;
+            if (AITimer >= 300)
+            {
+                AITimer = 0f;
+                AIState = (float)ActionState.TestAnimation;
+                NPC.netUpdate = true;
+            }
+        }
+
+        // -------------------------------------------------------
+        // Behavior: MiniOnlyAttack
+        // -------------------------------------------------------
+        private void DoBehavior_MiniOnlyAttack(Player player)
+        {
+            CurrentMiniBehavior = MiniBehavior.Orbit; // minis animate, boss doesn't
+
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
+            Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+            NPC.velocity = (targetPos - NPC.Center) * 0.06f;
+
+            // Boss stays frozen on frame 0
+            SharedFrame = 0;
+            frameTimer = 0;
+
+            AITimer++;
+            if (AITimer >= 300)
+            {
+                AITimer = 0f;
+                AIState = (float)ActionState.Idle; // transition to next attack here
+                NPC.netUpdate = true;
+            }
+        }
+
+        // -------------------------------------------------------
+        // Behavior: Reset
+        // -------------------------------------------------------
+        private ActionState previousAttack = ActionState.Reset;
+
+        private void DoBehavior_ResetAI()
+        {
+            CurrentMiniBehavior = MiniBehavior.Stay;
+
+            AttackTimer = 0f;
+            AITimer     = 0f;
+            ExtraTimer  = 0f;
+
+            NPC.TargetClosest(false);
+            NPC.velocity *= 0.95f;
+
+            if (Main.netMode != NetmodeID.MultiplayerClient)
+            {
+                ActionState nextAttack = ActionState.TestAnimation; // testing
+
+                previousAttack = nextAttack;
+                AIState        = (float)nextAttack;
+                AITimer        = 0f;
+                NPC.netUpdate  = true;
+            }
         }
 
         // -------------------------------------------------------
         // Placeholder stubs
         // -------------------------------------------------------
-        private void DoBehavior_ResetAI() { }
         private void DoBehavior_SpawnAnimation() { }
         private void DoBehavior_DeathAnimation() { }
 
         // -------------------------------------------------------
         // Shared frame advancement (15 frames, looping)
         // -------------------------------------------------------
-        private void AdvanceSharedFrame()
+        private void AdvanceSharedFrame(ActionState currentState)
         {
+            if (SharedFrame == 8 && currentState == ActionState.TestAnimation)
+                return;
+
             frameTimer++;
-            if (frameTimer >= FrameSpeed)
-            {
-                frameTimer = 0;
-                SharedFrame = (SharedFrame + 1) % 15;
-            }
+            if (frameTimer < FrameSpeed)
+                return;
+
+            frameTimer = 0;
+            SharedFrame = (SharedFrame + 1) % 15;
         }
 
         public override void PostDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-            if ((ActionState)AIState == ActionState.TestAnimation)
-                _glowEffect.Draw(spriteBatch, NPC, screenPos, SharedFrame);
+            _glowEffect.Draw(spriteBatch, NPC, screenPos, SharedFrame);
         }
 
         // -------------------------------------------------------

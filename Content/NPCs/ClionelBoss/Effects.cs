@@ -11,7 +11,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         // Tweak these
         // -------------------------------------------------------
-        public static readonly Vector2 EyeOffset = new Vector2(-10f, -72f);
+        public static readonly Vector2 EyeOffset = new Vector2(-10f, -53f);
         public const float GlowMaxScale = 0.7f;
         public const float GlowMinScale = 0f;
         public const int GlowScaleUpEndFrame = 6;
