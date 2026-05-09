@@ -15,24 +15,45 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
     public class Clionel : ModNPC
     {
         // -------------------------------------------------------
-        // Mini behavior modes — add new entries here for new attacks
+        // Animation sheet
+        // -------------------------------------------------------
+        public enum AnimationSheet
+        {
+            Idle,
+            Attack,
+            // Future: Attack2, Death, Spawn, etc.
+        }
+
+        public AnimationSheet CurrentSheet { get; private set; } = AnimationSheet.Idle;
+
+        public static int GetFrameCount(AnimationSheet sheet) => sheet switch
+        {
+            AnimationSheet.Idle   => 15,
+            AnimationSheet.Attack => 15,
+            _                     => 15,
+        };
+
+        public static string GetTexturePath(AnimationSheet sheet) => sheet switch
+        {
+            AnimationSheet.Idle   => "TheBattleCats/Content/NPCs/ClionelBoss/Clionel_Idle",
+            AnimationSheet.Attack => "TheBattleCats/Content/NPCs/ClionelBoss/Clionel_Attack",
+            _                     => "TheBattleCats/Content/NPCs/ClionelBoss/Clionel_Idle",
+        };
+
+        // -------------------------------------------------------
+        // Mini behavior modes
         // -------------------------------------------------------
         public enum MiniBehavior
         {
-            Stay,                  // minis locked to base offset, frozen on frame 0
-            AttackSynced,          // minis follow SharedFrame for position AND sprite
-            AttackIndependent,     // minis play animation freely, stay at base offset
-            AttackOneByOne,        // minis animate one at a time in slot order
-            AttackOneByOneAttack,  // minis charge up, launch, fade out, fade in one at a time
+            Stay,
+            AttackSynced,
+            AttackIndependent,
+            AttackOneByOne,
+            AttackOneByOneAttack,
         }
 
-        /// <summary>The current behavior mode the minis should execute.</summary>
         public MiniBehavior CurrentMiniBehavior { get; private set; } = MiniBehavior.Stay;
-
-        /// <summary>Which mini slot is currently animating during AttackOneByOne / AttackOneByOneAttack.</summary>
         public int ActiveMiniSlot { get; private set; } = 0;
-
-        /// <summary>Delay in ticks between each mini's turn during AttackOneByOneAttack.</summary>
         public const int OneByOneAttackDelay = 60;
 
         private int oneByOneDelayTimer = 0;
@@ -46,6 +67,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
             MiniOnlyAttack,
             OneByOne,
             OneByOneAttack,
+            LaserBeamAttack,
             Spawn,
             Reset,
             Death
@@ -58,33 +80,34 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
 
         public static int AllProjectileDamage => 20;
 
-        // -------------------------------------------------------
-        // Mini Clionel NPC slot tracking
-        // -------------------------------------------------------
         private int[] miniWhoAmI = new int[3] { -1, -1, -1 };
 
-        // -------------------------------------------------------
-        // Offsets from the boss centre for each mini.
-        // Edit these Vector2 values to reposition the minis.
-        // -------------------------------------------------------
         public static Vector2[] MiniOffsets = new Vector2[3]
         {
-            new Vector2(-100f, -90f),   // [0] Top-left
-            new Vector2( 100f, -90f),   // [1] Top-right
-            new Vector2( 100f,  90f),   // [2] Bottom-right
+            new Vector2(-100f, -90f),
+            new Vector2( 100f, -90f),
+            new Vector2( 100f,  90f),
         };
 
-        // -------------------------------------------------------
-        // Shared animation frame (written here, read by minis)
-        // -------------------------------------------------------
-        /// <summary>The animation frame that the boss AND all minis should display.</summary>
         public int SharedFrame { get; private set; } = 0;
 
         private int frameTimer = 0;
-        private const int FrameSpeed = 8; // ticks per frame
+        private const int FrameSpeed = 8;
 
-        private ActionState PreviousState = ActionState.TestAnimation;
+        private ActionState PreviousState = ActionState.Reset;
         private float LifeRatio;
+
+        // -------------------------------------------------------
+        // Laser state
+        // -------------------------------------------------------
+        public float LaserAngle { get; private set; } = 0f;
+        public bool LaserActive { get; private set; } = false;
+
+        public const float LaserStartOffset = -MathHelper.Pi / 3f;
+        public const float LaserSweepSpeed = 0.015f;
+        public const float LaserLength = 500f;
+        public const int LaserBeamPauseDuration = 300;
+        public static int LaserDamage => 20;
 
         // -------------------------------------------------------
         // SetDefaults / SetStaticDefaults
@@ -153,6 +176,9 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 case ActionState.OneByOneAttack:
                     DoBehavior_OneByOneAttack(player);
                     break;
+                case ActionState.LaserBeamAttack:
+                    DoBehavior_LaserBeamAttack(player);
+                    break;
                 case ActionState.Reset:
                     DoBehavior_ResetAI();
                     break;
@@ -164,23 +190,28 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                     break;
             }
 
+            if ((ActionState)AIState != ActionState.LaserBeamAttack)
+                LaserActive = false;
+
             AdvanceSharedFrame((ActionState)AIState);
         }
 
         // -------------------------------------------------------
-        // Mini orbit distance / lerp constants
+        // Mini constants
         // -------------------------------------------------------
         public const float MiniCloseDistance = 0.5f;
         public const float MiniOuterDistance = 1.5f;
         public const float MiniLerpSpeed = 0.06f;
 
         private readonly ClionelGlowEffect _glowEffect = new();
+        private readonly ClionelLaserEffect _laserEffect = new();
 
         // -------------------------------------------------------
         // Behavior: TestAnimation
         // -------------------------------------------------------
         private void DoBehavior_TestAnimation(Player player)
         {
+            CurrentSheet = AnimationSheet.Attack;
             CurrentMiniBehavior = MiniBehavior.AttackSynced;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
@@ -214,6 +245,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_TestAnimationShort(Player player)
         {
+            CurrentSheet = AnimationSheet.Attack;
             CurrentMiniBehavior = MiniBehavior.AttackSynced;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
@@ -236,14 +268,12 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_Idle(Player player)
         {
+            CurrentSheet = AnimationSheet.Idle;
             CurrentMiniBehavior = MiniBehavior.Stay;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
-
-            SharedFrame = 0;
-            frameTimer = 0;
 
             AITimer++;
             if (AITimer >= 300)
@@ -259,13 +289,13 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_MiniOnlyAttack(Player player)
         {
+            CurrentSheet = AnimationSheet.Idle;
             CurrentMiniBehavior = MiniBehavior.AttackIndependent;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
-            SharedFrame = 0;
             frameTimer = 0;
 
             bool allDone = true;
@@ -291,13 +321,13 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_OneByOne(Player player)
         {
+            CurrentSheet = AnimationSheet.Idle;
             CurrentMiniBehavior = MiniBehavior.AttackOneByOne;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
-            SharedFrame = 0;
             frameTimer = 0;
 
             if (ActiveMiniSlot < 3 &&
@@ -325,16 +355,15 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         private void DoBehavior_OneByOneAttack(Player player)
         {
+            CurrentSheet = AnimationSheet.Idle;
             CurrentMiniBehavior = MiniBehavior.AttackOneByOneAttack;
 
             NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
             Vector2 targetPos = player.Center + new Vector2(0f, -250f);
             NPC.velocity = (targetPos - NPC.Center) * 0.06f;
 
-            SharedFrame = 0;
             frameTimer = 0;
 
-            // Count down delay between minis
             if (waitingForNextMini)
             {
                 oneByOneDelayTimer++;
@@ -347,7 +376,6 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 return;
             }
 
-            // Check if the active mini finished its full sequence
             if (ActiveMiniSlot < 3 &&
                 miniWhoAmI[ActiveMiniSlot] >= 0 &&
                 miniWhoAmI[ActiveMiniSlot] < Main.maxNPCs)
@@ -377,6 +405,57 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         }
 
         // -------------------------------------------------------
+        // Behavior: LaserBeamAttack
+        // -------------------------------------------------------
+        private void DoBehavior_LaserBeamAttack(Player player)
+        {
+            CurrentSheet = AnimationSheet.Attack;
+            CurrentMiniBehavior = MiniBehavior.AttackSynced;
+
+            NPC.spriteDirection = player.Center.X > NPC.Center.X ? -1 : 1;
+            Vector2 targetPos = player.Center + new Vector2(0f, -250f);
+            NPC.velocity = (targetPos - NPC.Center) * 0.06f;
+
+            _glowEffect.Update();
+
+            if (SharedFrame == 8)
+            {
+                if (AttackTimer == 0)
+                {
+                    float angleToPlayer = (player.Center - NPC.Center).ToRotation();
+                    LaserAngle = angleToPlayer + LaserStartOffset;
+                    NPC.netUpdate = true;
+                }
+
+                LaserActive = true;
+                LaserAngle += LaserSweepSpeed;
+
+                Vector2 eyePos = NPC.Center + ClionelGlowEffect.EyeOffset * new Vector2(NPC.spriteDirection, 1f);
+                Vector2 laserEnd = eyePos + LaserAngle.ToRotationVector2() * LaserLength;
+
+                if (Collision.CheckAABBvLineCollision(player.TopLeft, player.Size, eyePos, laserEnd))
+                    player.Hurt(PlayerDeathReason.ByNPC(NPC.whoAmI), LaserDamage, 0);
+
+                AttackTimer++;
+                if (AttackTimer >= LaserBeamPauseDuration)
+                {
+                    AttackTimer   = 0f;
+                    LaserActive   = false;
+                    SharedFrame   = 9;
+                    NPC.netUpdate = true;
+                }
+            }
+
+            if (SharedFrame == 14 && frameTimer == FrameSpeed - 1)
+            {
+                AIState     = (float)ActionState.Reset;
+                SharedFrame = 0;
+                frameTimer  = 0;
+                NPC.netUpdate = true;
+            }
+        }
+
+        // -------------------------------------------------------
         // Behavior: Reset
         // -------------------------------------------------------
         private ActionState previousAttack = ActionState.Reset;
@@ -397,14 +476,15 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 // ActionState nextAttack;
                 // do
                 // {
-                //     nextAttack = Main.rand.Next(6) switch
+                //     nextAttack = Main.rand.Next(7) switch
                 //     {
                 //         0 => ActionState.TestAnimation,
                 //         1 => ActionState.TestAnimationShort,
                 //         2 => ActionState.Idle,
                 //         3 => ActionState.MiniOnlyAttack,
                 //         4 => ActionState.OneByOne,
-                //         _ => ActionState.OneByOneAttack,
+                //         5 => ActionState.OneByOneAttack,
+                //         _ => ActionState.LaserBeamAttack,
                 //     };
                 // }
                 // while (nextAttack == previousAttack);
@@ -425,26 +505,75 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         private void DoBehavior_DeathAnimation() { }
 
         // -------------------------------------------------------
-        // Shared frame advancement (15 frames, looping)
+        // Shared frame advancement
         // -------------------------------------------------------
         private void AdvanceSharedFrame(ActionState currentState)
         {
-            if (SharedFrame == 8 && currentState == ActionState.TestAnimation)
+            if (SharedFrame == 8 && (currentState == ActionState.TestAnimation ||
+                                     currentState == ActionState.LaserBeamAttack))
                 return;
 
             frameTimer++;
             if (frameTimer < FrameSpeed)
                 return;
 
-            frameTimer = 0;
-            SharedFrame = (SharedFrame + 1) % 15;
+            frameTimer  = 0;
+            SharedFrame = (SharedFrame + 1) % GetFrameCount(CurrentSheet);
         }
 
+        // -------------------------------------------------------
+        // PreDraw — draw correct spritesheet, cancel default draw
+        // -------------------------------------------------------
+        public override bool PreDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
+        {
+            Texture2D tex = ModContent.Request<Texture2D>(
+                GetTexturePath(CurrentSheet),
+                AssetRequestMode.ImmediateLoad).Value;
+
+            int frameCount  = GetFrameCount(CurrentSheet);
+            int frameHeight = tex.Height / frameCount;
+            Rectangle sourceRect = new Rectangle(0, SharedFrame * frameHeight, tex.Width, frameHeight);
+
+            Vector2 origin  = sourceRect.Size() / 2f;
+            Vector2 drawPos = NPC.Center - screenPos + new Vector2(0f, NPC.gfxOffY);
+
+            SpriteEffects effects = NPC.spriteDirection == 1
+                ? SpriteEffects.FlipHorizontally
+                : SpriteEffects.None;
+
+            spriteBatch.Draw(
+                tex,
+                drawPos,
+                sourceRect,
+                drawColor * NPC.Opacity,
+                NPC.rotation,
+                origin,
+                NPC.scale,
+                effects,
+                0f
+            );
+
+            return false;
+        }
+
+        // -------------------------------------------------------
+        // PostDraw
+        // -------------------------------------------------------
         public override void PostDraw(SpriteBatch spriteBatch, Vector2 screenPos, Color drawColor)
         {
-            _glowEffect.Draw(spriteBatch, NPC, screenPos, SharedFrame);
+            if (CurrentSheet == AnimationSheet.Attack)
+                _glowEffect.Draw(spriteBatch, NPC, screenPos, SharedFrame);
+
+            if (LaserActive)
+            {
+                Vector2 eyePos = NPC.Center + ClionelGlowEffect.EyeOffset * new Vector2(NPC.spriteDirection, 1f);
+                _laserEffect.Draw(spriteBatch, eyePos, screenPos, LaserAngle, LaserLength);
+            }
         }
 
+        // -------------------------------------------------------
+        // FindFrame
+        // -------------------------------------------------------
         public override void FindFrame(int frameHeight)
         {
             NPC.frame.Y = SharedFrame * frameHeight;

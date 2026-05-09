@@ -262,6 +262,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         // AttackOneByOneAttack — charge → wait → launch → finish+fade → fadein
         // -------------------------------------------------------
+
         private void DoMiniBehavior_AttackOneByOneAttack(Clionel clionel, Vector2 baseOffset, NPC owner)
         {
             AnimationFinished = false;

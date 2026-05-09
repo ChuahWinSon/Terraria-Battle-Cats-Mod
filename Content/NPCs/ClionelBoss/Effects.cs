@@ -11,7 +11,7 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
         // -------------------------------------------------------
         // Tweak these
         // -------------------------------------------------------
-        public static readonly Vector2 EyeOffset = new Vector2(-10f, -53f);
+        public static readonly Vector2 EyeOffset = new Vector2(-10f, -40f);
         public const float GlowMaxScale = 0.7f;
         public const float GlowMinScale = 0f;
         public const int GlowScaleUpEndFrame = 6;
@@ -97,6 +97,55 @@ namespace TheBattleCats.Content.NPCs.ClionelBoss
                 SpriteEffects.None,
                 0f
             );
+        }
+    }
+
+    // -------------------------------------------------------
+    // Laser beam drawn from the boss eye
+    // -------------------------------------------------------
+    public class ClionelLaserEffect
+    {
+        private const string HeadPath = "TheBattleCats/Content/NPCs/ClionelBoss/LaserBeam_Head";
+        private const string BodyPath = "TheBattleCats/Content/NPCs/ClionelBoss/LaserBeam_Body";
+        private const string TailPath = "TheBattleCats/Content/NPCs/ClionelBoss/LaserBeam_Tail";
+
+        public void Draw(SpriteBatch spriteBatch, Vector2 eyePos, Vector2 screenPos, float angle, float length)
+        {
+            Texture2D headTex = ModContent.Request<Texture2D>(HeadPath, AssetRequestMode.ImmediateLoad).Value;
+            Texture2D bodyTex = ModContent.Request<Texture2D>(BodyPath, AssetRequestMode.ImmediateLoad).Value;
+            Texture2D tailTex = ModContent.Request<Texture2D>(TailPath, AssetRequestMode.ImmediateLoad).Value;
+
+            Vector2 dir = angle.ToRotationVector2();
+            Vector2 origin = new Vector2(0f, headTex.Height / 2f);
+
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive,
+                SamplerState.PointClamp, null, null, null, Main.GameViewMatrix.TransformationMatrix);
+
+            // Draw head at eye position
+            Vector2 drawPos = eyePos - screenPos;
+            spriteBatch.Draw(headTex, drawPos, null, Color.White, angle, origin, 1f, SpriteEffects.None, 0f);
+
+            // Draw body segments between head and tail
+            float coveredLength = headTex.Width;
+            float bodyLength = length - headTex.Width - tailTex.Width;
+
+            while (coveredLength < headTex.Width + bodyLength)
+            {
+                drawPos = eyePos - screenPos + dir * coveredLength;
+                spriteBatch.Draw(bodyTex, drawPos, null, Color.White, angle,
+                    new Vector2(0f, bodyTex.Height / 2f), 1f, SpriteEffects.None, 0f);
+                coveredLength += bodyTex.Width;
+            }
+
+            // Draw tail at the end
+            drawPos = eyePos - screenPos + dir * (length - tailTex.Width);
+            spriteBatch.Draw(tailTex, drawPos, null, Color.White, angle,
+                new Vector2(0f, tailTex.Height / 2f), 1f, SpriteEffects.None, 0f);
+
+            spriteBatch.End();
+            spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend,
+                SamplerState.PointClamp, null, null, null, Main.GameViewMatrix.TransformationMatrix);
         }
     }
 }
